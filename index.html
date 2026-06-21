@@ -1229,6 +1229,9 @@ class Battle extends Phaser.Scene {
   buildHUD(){
     const F={fontFamily:'"Oswald",sans-serif'};
     this.hudScore = this.add.text(24,18,'00000',{...F,fontSize:'30px',fontStyle:'600',color:'#e7e6df'}).setDepth(90);
+    // r58: difficulty in-game badge(左上 score 下方,玩家时刻知道当前难度)
+    this.hudDifficulty = this.add.text(24,76,'',{fontFamily:'"Black Ops One",cursive', fontSize:'11px', color:'#d8b15a'}).setDepth(90);
+    this.hudDifficulty.setLetterSpacing && this.hudDifficulty.setLetterSpacing(3);
     this.add.text(24,54,'SCORE',{...F,fontSize:'12px',color:'#9aa3a0'}).setDepth(90).setLetterSpacing?.(2);
     this.hudWave = this.add.text(DW/2,20,'Wave 1',{fontFamily:'"Black Ops One"',fontSize:'26px',color:'#d8b15a'}).setOrigin(0.5,0).setDepth(90);
     // r42+r43-fix: wave countdown ring — 挪到血条下方避覆盖(cy 84 在 hpFill cy 60 + 24 间距)
@@ -1386,9 +1389,11 @@ class Battle extends Phaser.Scene {
   startGame(opts){ this.resetState(); this.state='play'; AudioFX.wave();
     this._rebuildWeaponCache && this._rebuildWeaponCache();                  // r43: Armory upgrades 应用
     // r57: 难度倍率 apply(zombie hp + spawn count)
-    const DIFF = { EASY:{hpMul:0.65, spawnMul:0.75}, NORMAL:{hpMul:1.0, spawnMul:1.0}, HARD:{hpMul:1.4, spawnMul:1.25} };
+    const DIFF = { EASY:{hpMul:0.65, spawnMul:0.75, creditMul:0.7, color:'#5fae6a'}, NORMAL:{hpMul:1.0, spawnMul:1.0, creditMul:1.0, color:'#d8b15a'}, HARD:{hpMul:1.4, spawnMul:1.25, creditMul:1.5, color:'#ff3a2a'} };
     let d = 'NORMAL'; try{ d = localStorage.getItem('bt_difficulty') || 'NORMAL'; }catch(e){}
     this._diff = DIFF[d] || DIFF.NORMAL;
+    this._diffName = d;                                              // r58: 名字给 badge / credits 用
+    if(this.hudDifficulty){ this.hudDifficulty.setText('◆ '+d).setColor(this._diff.color); }
     // r38: resume — opts={level,score,kills,best} 从存档还原(否则全新开局)
     if(opts && opts.level && opts.level>=1 && opts.level<=10){
       this.level = opts.level;
@@ -1780,7 +1785,8 @@ class Battle extends Phaser.Scene {
     this._unlockAch && this._unlockAch('cycle_holds');                               // r44: 通关成就
     // r43: 通关授 Cycle Credits(按整局最末关 rank · S=4/A=3/B=2/C=1)
     const last = (this.chapterStats||[])[this.chapterStats?.length-1];
-    const award = {S:4, A:3, B:2, C:1}[last?.rank?.letter || 'C'] || 1;
+    const baseAward = {S:4, A:3, B:2, C:1}[last?.rank?.letter || 'C'] || 1;
+    const award = Math.max(1, Math.round(baseAward * (this._diff?.creditMul || 1)));   // r58 难度乘 EASY 0.7 / HARD 1.5
     try{ const cur = +(localStorage.getItem('bt_credits')||0); localStorage.setItem('bt_credits', cur + award); this._lastCreditsAwarded = award; }catch(e){}
     const bb=document.getElementById('battleBgm'); bb&&bb.pause(); AudioFX.stopBGM();
     const vm=document.getElementById('victoryBgm'); if(vm){ vm.volume=0.62; vm.currentTime=0; vm.play().catch(()=>{}); }
@@ -2146,6 +2152,21 @@ class Battle extends Phaser.Scene {
         });
       }
     }
+  }
+  // r58: BOSS 攻击预警 telegraph — atkT 进入 0.4s 窗口时屏底中央(bunker 位置)显红圈 + 缩放警告
+  _bossAtkTelegraph(z){
+    if(!z || !z.spr) return;
+    // bunker 位置 ≈ 屏底中央
+    const bx = DW/2, by = DH - 80;
+    // 红色警告圈 — 从 BOSS 位置缩 → bunker(模拟攻击轨迹)
+    const ring = this.add.circle(z.spr.x, z.spr.getBounds().centerY + 40, 90)
+      .setStrokeStyle(5, 0xff3a2a, 0.9).setDepth(86).setBlendMode('ADD');
+    this.tweens.add({targets:ring, x:bx, y:by, radius:60, alpha:0, duration:380, ease:'Quad.easeIn', onComplete:()=>ring.destroy()});
+    // bunker 处闪红 X 标记
+    const x1 = this.add.text(bx, by, '⚠', {fontFamily:'"Black Ops One",cursive', fontSize:'42px', color:'#ff3a2a', stroke:'#3a0a0a', strokeThickness:4}).setOrigin(0.5).setDepth(87).setAlpha(0);
+    this.tweens.add({targets:x1, alpha:1, scale:1.3, duration:160, ease:'Back.easeOut'});
+    this.tweens.add({targets:x1, alpha:0, duration:240, delay:200, onComplete:()=>x1.destroy()});
+    AudioFX.dry && AudioFX.dry();   // 短促"嘀"警告
   }
   // r56: FL 右键扇形 AOE — 5 shots 在准星 ±30° 扇形分散 + ammo cost 5 + 1.5s cooldown
   _flAltFire(){
@@ -2929,10 +2950,16 @@ class Battle extends Phaser.Scene {
         z.atkT-=dt; if(z.atkT<=0){ z.atkT=z.cfg.fireEvery||2.0; this.spit(z); } }
       else if(z.p>=1){
         if(z.cfg.behavior==='explode'){ this.explode(z); }
-        else { z.atkT-=dt; if(z.atkT<=0){ z.atkT=z.cfg.boss?1.6:0.85;
-          // r28: Leviathan 攻击 bunker 时切 slash 帧(左右交替)
-          if(z.type==='leviathan') this.bossLevSlash(z);
-          this.hurtBunker(z.cfg.dmg||10); } } }
+        else { z.atkT-=dt;
+          // r58: BOSS 攻击预警 telegraph — atkT 进入 0.4s 窗口时触发 1 次红圈警告
+          if(z.cfg.boss && z.atkT > 0 && z.atkT < 0.40 && !z._atkTeleg){
+            z._atkTeleg = true;
+            this._bossAtkTelegraph && this._bossAtkTelegraph(z);
+          }
+          if(z.atkT<=0){ z.atkT=z.cfg.boss?1.6:0.85; z._atkTeleg = false;
+            // r28: Leviathan 攻击 bunker 时切 slash 帧(左右交替)
+            if(z.type==='leviathan') this.bossLevSlash(z);
+            this.hurtBunker(z.cfg.dmg||10); } } }
     }
 
     // 补给下落 / 拾取
@@ -3124,7 +3151,7 @@ class Battle extends Phaser.Scene {
     // r38: top5 排行 + 渲染到 over screen
     this._saveTopAttempt && this._saveTopAttempt('overrun');
     // r43: overrun 也给少量 credits(level/3 取整,鼓励尝试)
-    try{ const cur = +(localStorage.getItem('bt_credits')||0); const award = Math.max(1, Math.floor(this.level/3)); localStorage.setItem('bt_credits', cur + award); this._lastCreditsAwarded = award; }catch(e){}
+    try{ const cur = +(localStorage.getItem('bt_credits')||0); const baseAward = Math.max(1, Math.floor(this.level/3)); const award = Math.max(1, Math.round(baseAward * (this._diff?.creditMul || 1))); localStorage.setItem('bt_credits', cur + award); this._lastCreditsAwarded = award; }catch(e){}   // r58 难度乘
     this._renderTop5 && this._renderTop5();
     document.getElementById('over').classList.remove('hidden');
     if(this.banner) this.banner.setAlpha(0);
