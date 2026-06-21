@@ -2020,6 +2020,8 @@ class Battle extends Phaser.Scene {
     let hit=null, hitScore=Infinity;
     for(const z of this.zombies){ if(z.dead)continue; const b=z.spr.getBounds(); const hx=b.x+b.width*HITBOX.x, hw=b.width*HITBOX.w, hy=b.y+b.height*HITBOX.y, hh=b.height*HITBOX.h; if(px>=hx&&px<=hx+hw&&py>=hy&&py<=hy+hh){ const cx=hx+hw/2, dx=px-cx, dy=py-(hy+hh/2); const sc=-z.p*1000+Math.hypot(dx,dy); if(sc<hitScore){ hit=z; hitScore=sc; } } }
     if(hit){ const b=hit.spr.getBounds(); const hy=b.y+b.height*HITBOX.y, hh=b.height*HITBOX.h; const head=py<hy+hh*0.22; const dmg=(head?w.headMul:1)*w.dmg*((this.boostTimer||0)>0?2:1)*((this._bloodlustT||0)>0?1.5:1);     // r47 bloodlust ×1.5
+      // r49: cross-hair hit confirmation flash — head 金 / body 绿,缩小+tint 90ms 反馈
+      this._crossHitFlash && this._crossHitFlash(head);
       hit.hp-=dmg; (hit.cfg.boss?AudioFX.bossHit(hit.spr.x):AudioFX.hit(hit.spr.x));
       // r28: Leviathan 命中触发 hurt 帧(替代 tint 闪)
       if(hit.type==='leviathan') this.bossLevHurt(hit);
@@ -2114,6 +2116,16 @@ class Battle extends Phaser.Scene {
     if(this._bloodlustT === 0){
       if(this.edgePulse) this.edgePulse.setAlpha(0);
     }
+  }
+  // r49: cross-hair hit flash — 命中瞬间 cross 缩小 + tint(head 金 / body 绿)90ms 自动复原
+  _crossHitFlash(isHead){
+    if(!this.cross) return;
+    const color = isHead ? 0xffd24a : 0x5fae6a;
+    this.tweens.killTweensOf(this.cross);
+    this.cross.setTint(color); this.cross.setScale(0.78);
+    this.tweens.add({targets:this.cross, scale:1.0, duration:90, ease:'Back.easeOut',
+      onComplete: ()=>{ this.cross.clearTint(); }
+    });
   }
   // r46: Critical hit — 高伤爆头触发:80ms 玩法 freeze + 红 flash + 'CRITICAL' 大字 + camera punch zoom
   _critHit(x, y){
@@ -2918,6 +2930,33 @@ document.getElementById('armoryBackBtn').addEventListener('click',()=>{
 });
 // 启动同步一次
 setTimeout(()=>_syncArmoryBtn(), 1300);
+// r49: Daily login bonus — 每日首次启动给 +2 Cycle Credits,localStorage bt_last_login 跟踪
+function _checkDailyLogin(){
+  try{
+    const today = new Date().toISOString().slice(0,10);            // yyyy-mm-dd
+    const last = localStorage.getItem('bt_last_login') || '';
+    if(last === today) return;                                     // 今天已 claim
+    localStorage.setItem('bt_last_login', today);
+    const cur = +(localStorage.getItem('bt_credits')||0);
+    const bonus = 2;
+    localStorage.setItem('bt_credits', cur + bonus);
+    _syncArmoryBtn();                                              // 立刻更新 ARMORY · N CREDITS 显示
+    // 显示 banner(title screen 不可见时仍弹,因 daily 是 game-wide)
+    const b = document.createElement('div');
+    b.style.cssText = 'position:fixed;top:24vh;left:50%;transform:translateX(-50%) translateY(-30px);z-index:60;'+
+      'background:linear-gradient(180deg,rgba(48,36,16,.96),rgba(36,28,12,.98));'+
+      'border:1px solid #a07020;box-shadow:0 4px 32px rgba(216,177,90,.4);'+
+      'padding:14px 26px;font-family:"Black Ops One",cursive;color:#ffd24a;'+
+      'font-size:18px;letter-spacing:3px;text-align:center;'+
+      'opacity:0;transition:opacity .5s ease, transform .5s cubic-bezier(.22,1,.36,1)';
+    b.innerHTML = '🎁 DAILY BONUS · +'+bonus+' CYCLE CREDITS' +
+      '<div style="font-family:Oswald,sans-serif;font-size:11px;color:#c8b888;margin-top:6px;letter-spacing:4px">Spend at the Armory · Welcome back, Marshal.</div>';
+    document.body.appendChild(b);
+    requestAnimationFrame(()=>{ b.style.opacity='1'; b.style.transform='translateX(-50%) translateY(0)'; });
+    setTimeout(()=>{ b.style.opacity='0'; setTimeout(()=>b.remove(), 600); }, 3600);
+  }catch(e){}
+}
+setTimeout(()=>_checkDailyLogin(), 1400);                          // 1.4s 让 ARMORY btn 先 sync
 document.getElementById('codexBackBtn').addEventListener('click',()=>{
   document.getElementById('codexMenu').classList.add('hidden');
   document.getElementById('title').classList.remove('hidden');
