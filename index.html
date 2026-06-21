@@ -1327,6 +1327,7 @@ class Battle extends Phaser.Scene {
     this.roarBusy=0; this.slowmoT=0; this.slowmoCD=0; this.boostTimer=0; this.activeBoss=null; this._phaseFreeze=0;
     this._bloodlustT=0; this._headshotChain=[];                       // r47
     this._fireHeat=0; this._overheatT=0;                              // r51 overheat
+    if(this._srZoomActive) this._exitSRZoom && this._exitSRZoom();    // r54 SR zoom 复位
     if(this.phaseVig)this.phaseVig.setAlpha(0);
     const _bb=document.getElementById('bossBgm'); _bb&&_bb.pause();
     if(this.slowVig)this.slowVig.setAlpha(0);
@@ -1336,8 +1337,18 @@ class Battle extends Phaser.Scene {
 
   bindInput(){
     this.input.on('pointermove',p=>{ this.cross.setPosition(p.x,p.y); });
-    this.input.on('pointerdown',p=>{ AudioFX.shot && 0; this.cross.setPosition(p.x,p.y); this.firing=true; if(this.state==='play')this.tryFire(); });
-    this.input.on('pointerup',()=>{ this.firing=false; });
+    this.input.on('pointerdown',p=>{ AudioFX.shot && 0; this.cross.setPosition(p.x,p.y);
+      // r54: SR 右键长按 zoom 瞄准镜
+      if(p.button === 2 && this.weapon && this.weapon().id === 'rifle'){ this._enterSRZoom && this._enterSRZoom(); return; }
+      this.firing=true; if(this.state==='play')this.tryFire();
+    });
+    this.input.on('pointerup',p=>{
+      // r54: SR 右键松开 退 zoom
+      if(this._srZoomActive && (p === undefined || p.button === 2)){ this._exitSRZoom && this._exitSRZoom(); return; }
+      this.firing=false;
+    });
+    // r54: 阻止浏览器原生右键菜单(防 SR 长按 zoom 触发 context menu)
+    if(this.game && this.game.canvas) this.game.canvas.oncontextmenu = e => e.preventDefault();
     this.input.keyboard.on('keydown-R',()=>this.reload());
     this.input.keyboard.on('keydown-P',()=>{ if(this.state==='play')this.showPauseMenu(); else if(this.state==='pause')this.hidePauseMenu(); });
     this.input.keyboard.on('keydown-ESC',()=>{ if(this.state==='play')this.showPauseMenu(); else if(this.state==='pause')this.hidePauseMenu(); });
@@ -1466,6 +1477,25 @@ class Battle extends Phaser.Scene {
       const e = this.zombies[this.zombies.length-1];
       if(e){ e.emerge=0; e.roared=true; e._isBossEscort=true; }
     }));
+  }
+  // r54: 碉堡塌陷 particles — gameOver 触发,屏底中央 + 左右 dust + gore burst 模拟"墙裂"
+  _bunkerCollapseFx(){
+    if(!this.dust || !this.gore) return;
+    const Y = DH - 60;
+    [DW*0.3, DW*0.5, DW*0.7].forEach((x, i)=>{
+      this.time.delayedCall(i * 180, ()=>{
+        this.dust.emitParticleAt(x, Y, 24);                          // 厚 dust
+        this.gore.emitParticleAt(x, Y, 8);                           // 少量 debris
+        if(this.cameras && this.cameras.main) this.cameras.main.shake(180, 0.012);
+      });
+    });
+    // 屏底全宽 dust 横线扩散(再延 540ms,模拟"墙完全塌")
+    this.time.delayedCall(540, ()=>{
+      for(let i=0; i<6; i++){
+        this.dust.emitParticleAt(rnd(80, DW-80), Y + rnd(-30, 20), 6);
+      }
+    });
+    AudioFX.thunder && AudioFX.thunder();                            // 复用 thunder 当"轰隆"塌陷音
   }
   // r53: BOSS encounter intro shot — 1.6s zoom-in + slow-mo + 中央大字 "☠ BOSS · NAME ☠" Back.easeOut 弹入
   _showBossIntroShot(z){
@@ -2086,7 +2116,24 @@ class Battle extends Phaser.Scene {
       }
     }
   }
+  // r54: SR 瞄准镜 zoom — 右键长按 cam zoomTo 1.5 + 准星 scale 0.6 + 后坐减半;退则还原
+  _enterSRZoom(){
+    if(this._srZoomActive || this.state !== 'play') return;
+    this._srZoomActive = true;
+    if(this.cameras && this.cameras.main) this.cameras.main.zoomTo(1.5, 200, 'Quad.easeOut');
+    if(this.cross){ this.cross.setScale(0.6); this.cross.setTint(0xffd24a); }
+    AudioFX.diveIn && AudioFX.diveIn();                              // lowpass 模拟"屏息"
+  }
+  _exitSRZoom(){
+    if(!this._srZoomActive) return;
+    this._srZoomActive = false;
+    if(this.cameras && this.cameras.main) this.cameras.main.zoomTo(1.0, 200, 'Quad.easeOut');
+    if(this.cross){ this.cross.setScale(1.0); this.cross.clearTint(); }
+    AudioFX.diveOut && AudioFX.diveOut();
+    this.firing = false;                                             // 退时停 fire 防漏点
+  }
   switchWeapon(idx){ if(idx<0||idx>=WEAPONS.length||idx===this.weaponIdx)return;
+    if(this._srZoomActive) this._exitSRZoom();                       // r54: 切武器自动退 zoom
     this.wAmmo[this.weapon().id]=this.ammo; this.reloading=false; this.reloadT=0; this.cooldown=0.12;
     this.weaponIdx=idx; this.syncWeapon(); AudioFX.reload(); this.showBanner('▸ '+this.weapon().name); }
 
@@ -2931,6 +2978,8 @@ class Battle extends Phaser.Scene {
     // 找最近 / 最逼近的 zombie 作 "last attacker"
     let target = null, bestP = -1;
     for(const z of this.zombies){ if(z.dead)continue; if(z.p>bestP){ bestP=z.p; target=z; } }
+    // r54: 碉堡塌陷 particles — 屏底中央 dust + gore burst + 沿底排 3 处分散
+    this._bunkerCollapseFx && this._bunkerCollapseFx();
     // 慢镜 + 暗角 + low-pass dive
     this.slowmoT = 1.6; if(this.slowVig)this.slowVig.setAlpha(0.78);
     AudioFX.diveIn && AudioFX.diveIn();
