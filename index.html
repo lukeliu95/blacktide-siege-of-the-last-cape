@@ -865,12 +865,28 @@ const AudioFX = (() => {
       const _sink=panTo(a,x);
       const n=Math.floor(a.sampleRate*0.05),buf=a.createBuffer(1,n,a.sampleRate),d=buf.getChannelData(0); for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
       const s=a.createBufferSource(),g=a.createGain(),f=a.createBiquadFilter(); s.buffer=buf; f.type='lowpass'; f.frequency.value=1500; g.gain.value=.08; s.connect(f).connect(g).connect(_sink); s.start(); },
-    kill(x){ const a=ensure(); if(!a){ tone(rnd(80,120),.22,'sawtooth',.08,40); noise(.16,.10,1200); return; }
+    kill(x, combo){ const a=ensure(); if(!a){ tone(rnd(80,120),.22,'sawtooth',.08,40); noise(.16,.10,1200); return; }
       const _sink=panTo(a,x), t=a.currentTime;
       const f0=rnd(80,120);
       const o=a.createOscillator(),og=a.createGain(); o.type='sawtooth'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(40,t+0.22); og.gain.setValueAtTime(.08,t); og.gain.exponentialRampToValueAtTime(.0001,t+0.22); o.connect(og).connect(_sink); o.start(t); o.stop(t+0.24);
       const n2=Math.floor(a.sampleRate*0.16),buf2=a.createBuffer(1,n2,a.sampleRate),d2=buf2.getChannelData(0); for(let i=0;i<n2;i++)d2[i]=(Math.random()*2-1)*(1-i/n2);
-      const s2=a.createBufferSource(),g2=a.createGain(),f2=a.createBiquadFilter(); s2.buffer=buf2; f2.type='lowpass'; f2.frequency.value=1200; g2.gain.value=.10; s2.connect(f2).connect(g2).connect(_sink); s2.start(); },
+      const s2=a.createBufferSource(),g2=a.createGain(),f2=a.createBiquadFilter(); s2.buffer=buf2; f2.type='lowpass'; f2.frequency.value=1200; g2.gain.value=.10; s2.connect(f2).connect(g2).connect(_sink); s2.start();
+      // r51: combo layering — combo>=10 加 hi tone tier(每 tier +1 octave & 短促叮)
+      const c = combo||0;
+      if(c >= 10){
+        const tier = c>=60 ? 3 : c>=30 ? 2 : 1;
+        const baseFreq = 660 * Math.pow(1.5, tier-1);                    // 660 → 990 → 1485 Hz
+        const dur = 0.10 + tier * 0.04;
+        for(let h=0; h<tier; h++){
+          const oh=a.createOscillator(), gh=a.createGain();
+          oh.type = 'sine'; oh.frequency.value = baseFreq * (1 + h*0.5);
+          gh.gain.setValueAtTime(0, t+h*0.018);
+          gh.gain.linearRampToValueAtTime(0.08, t+h*0.018+0.006);
+          gh.gain.exponentialRampToValueAtTime(0.001, t+h*0.018+dur);
+          oh.connect(gh).connect(_sink); oh.start(t+h*0.018); oh.stop(t+h*0.018+dur+0.02);
+        }
+      }
+    },
     hurt(){ tone(150,.3,'sawtooth',.12,55); noise(.22,.16,900); },
     wave(){ tone(330,.16,'triangle',.07); setTimeout(()=>tone(495,.2,'triangle',.07),150); },
     supply(){ tone(820,.1,'triangle',.06); setTimeout(()=>tone(1230,.14,'triangle',.06),100); },
@@ -1308,6 +1324,7 @@ class Battle extends Phaser.Scene {
     this.zombies.forEach(z=>{ z.shadow&&z.shadow.destroy(); z.spr.destroy(); }); this.zombies=[];
     this.roarBusy=0; this.slowmoT=0; this.slowmoCD=0; this.boostTimer=0; this.activeBoss=null; this._phaseFreeze=0;
     this._bloodlustT=0; this._headshotChain=[];                       // r47
+    this._fireHeat=0; this._overheatT=0;                              // r51 overheat
     if(this.phaseVig)this.phaseVig.setAlpha(0);
     const _bb=document.getElementById('bossBgm'); _bb&&_bb.pause();
     if(this.slowVig)this.slowVig.setAlpha(0);
@@ -2350,7 +2367,18 @@ class Battle extends Phaser.Scene {
     const w=this.weapon();
     if(this.reloading||this.cooldown>0)return;
     if(this.ammo<=0){ AudioFX.dry(); this.reload(); return; }
-    this.ammo--; this.cooldown=w.fireRate/1000; AudioFX[w.sfx](this.muzzleX);
+    // r51: weapon overheat — auto 武器(MG/FL)持续 fire 累 _fireHeat,>5s 触发 _overheatT=3 期间 fireRate ×2
+    const isOverheating = (this._overheatT||0) > 0;
+    const fireRateScale = isOverheating ? 2.0 : 1.0;
+    this.ammo--; this.cooldown=(w.fireRate/1000) * fireRateScale; AudioFX[w.sfx](this.muzzleX);
+    if(w.auto){
+      this._fireHeat = (this._fireHeat||0) + (w.fireRate/1000);
+      if(this._fireHeat >= 5.0 && !this._overheatT){
+        this._overheatT = 3.0; this._fireHeat = 0;
+        AudioFX.dry && AudioFX.dry();
+        if(this.cameras && this.cameras.main) this.cameras.main.shake(140, 0.006);
+      }
+    }
     const mx=this.muzzleX, my=this.muzzleY;
     // 枪口火光(重后坐武器更大)
     this.muzzle.setPosition(mx+rnd(-6,6), my).setVisible(true).setScale(rnd(.7,1.15)*(w.recoil>2?1.5:1)).setAngle(rnd(0,360)).setAlpha(1);
@@ -2447,7 +2475,7 @@ class Battle extends Phaser.Scene {
     }
     z.shadow && this.tweens.add({targets:z.shadow,alpha:0,duration:420});
     const pts=Math.round(z.cfg.score*(1+Math.floor(this.combo/5)*0.5));
-    AudioFX.kill(z.spr.x); const load=this.zombies.length, burst0=(z.type==='brute'?40:22)*(load>18?0.5:1); this.bloods.emitParticleAt(z.spr.x, y, burst0);
+    AudioFX.kill(z.spr.x, this.combo); const load=this.zombies.length, burst0=(z.type==='brute'?40:22)*(load>18?0.5:1); this.bloods.emitParticleAt(z.spr.x, y, burst0);
     if(z.cfg.boss){
       // r41: BOSS 死时 score chunks 飘字向 hudScore 飞 + 逐个累加(替原单 +pts 立加)
       this._spawnScoreChunks && this._spawnScoreChunks(z.spr.x, z.spr.getBounds().centerY, pts);
@@ -2599,6 +2627,9 @@ class Battle extends Phaser.Scene {
     if(this.firing)this.tryFire();
     if(this._flameOnT>0){ this._flameOnT-=dt; if(this._flameOnT<=0 && this.flameSpr){ this.flameSpr.setVisible(false); this.flameSpr.anims.stop(); } }
     this.cooldown=Math.max(0,this.cooldown-dt);
+    // r51: overheat tick — 不持续 fire 时 _fireHeat 慢冷却,_overheatT 减
+    if(!this.firing && (this._fireHeat||0) > 0) this._fireHeat = Math.max(0, this._fireHeat - dt*1.2);
+    if((this._overheatT||0) > 0){ this._overheatT = Math.max(0, this._overheatT - dt); }
     if(this.reloading){ this.reloadT-=dt; if(this.reloadT<=0){ this.reloading=false; this.ammo=this.clip; AudioFX.reloadDone();
       this._reloadDoneSweep && this._reloadDoneSweep();                                  // r46: 金光 sweep
     } }
@@ -2793,6 +2824,21 @@ class Battle extends Phaser.Scene {
       this._bloodlustTxt.setAlpha(pulse);
     } else {
       this._bloodlustTxt.setText('');
+    }
+    // r51: overheat HUD 指示(右下武器名旁红字 OVERHEAT · Ns)
+    if(!this._overheatTxt) this._overheatTxt = this.add.text(DW-26, DH-66, '', {fontFamily:'"Black Ops One",cursive', fontSize:'12px', color:'#ff3a2a', stroke:'#3a0a0a', strokeThickness:2}).setOrigin(1, 1).setDepth(93);
+    if((this._overheatT||0) > 0){
+      this._overheatTxt.setText('⚠ OVERHEAT · '+this._overheatT.toFixed(1)+'s');
+      const pulse = 0.65 + 0.35*Math.sin(this.time.now/90);
+      this._overheatTxt.setAlpha(pulse);
+    } else {
+      // 接近过热预警(_fireHeat>3.5)显小提示
+      if((this._fireHeat||0) > 3.5){
+        const ratio = Math.min(1, this._fireHeat/5);
+        this._overheatTxt.setText('• HEAT '+Math.round(ratio*100)+'%').setColor('#d8b15a').setAlpha(0.8);
+      } else {
+        this._overheatTxt.setText('').setColor('#ff3a2a');
+      }
     }
     if(this.activeBoss && !this.activeBoss.dead && this.bossHpFill){
       const bz=this.activeBoss, p=Math.max(0,bz.hp/bz.maxhp);
