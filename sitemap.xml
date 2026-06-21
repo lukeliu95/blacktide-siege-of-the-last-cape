@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemap.org/schemas/0.9/sitemap-schema.xsd"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://normandy-bunker-shooter.vercel.app/</loc>
+    <lastmod>2026-06-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://normandy-bunker-shooter.vercel.app/assets/og-blacktide.png</image:loc>
+      <image:title>BLACKTIDE · Siege of the Last Cape — Free 2D Shooter Games Browser FPS</image:title>
+      <image:caption>Marshal Eisen holds the Last Cape against the drowned dead during Cycle 9. Free cinematic 2D shooter game playable in browser, no download.</image:caption>
+    </image:image>
+  </url>
+</urlset>
