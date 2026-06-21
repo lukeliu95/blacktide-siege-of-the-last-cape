@@ -1095,6 +1095,8 @@ class Battle extends Phaser.Scene {
     this.clothShred = this.add.particles(0,0,'spark',{ lifespan:1400, speed:{min:40,max:160}, scale:{start:0.8,end:0}, alpha:{start:.8,end:0}, tint:[0x4a3a28,0x6a5040,0x3a2a1c], gravityY:220, emitting:false, maxParticles:80 }).setDepth(82);
     // r22: 枪口烟雾(NORMAL blend,上升)+ 弹壳抛出(金黄,下落)
     this.muzzleSmoke = this.add.particles(0,0,'spark',{ lifespan:520, speed:{min:18,max:55}, speedY:{min:-90,max:-40}, scale:{start:0.9,end:2.4}, alpha:{start:0.35,end:0}, tint:[0xcfd0d2,0xa8acae,0x6a6e72], gravityY:-30, emitting:false, blendMode:'NORMAL', maxParticles:60 }).setDepth(58);
+    // r52: 命中 spark burst — 金色 ADD blendMode 短促爆,head 时 scale 1.5 加亮
+    this.hitSpark = this.add.particles(0,0,'spark',{ lifespan:280, speed:{min:120,max:280}, scale:{start:0.85,end:0.1}, alpha:{start:1,end:0}, tint:[0xffd24a,0xfff4cc,0xff8c2a], gravityY:0, rotate:{min:0,max:360}, emitting:false, blendMode:'ADD', maxParticles:80 }).setDepth(84);
     // r42: Combo heat trail — combo ≥ 15 时枪口持续小火苗拖尾(combo 越高 emit 越密 + 色越红)
     this.heatTrail = this.add.particles(0,0,'spark',{ lifespan:680, speedY:{min:-160,max:-80}, speedX:{min:-22,max:22}, scale:{start:1.3,end:0.2}, alpha:{start:0.85,end:0}, tint:[0xffd24a, 0xff8c2a], gravityY:-180, emitting:false, blendMode:'ADD', frequency:2000, maxParticles:80 }).setDepth(60);
     this.shellEject = this.add.particles(0,0,'spark',{ lifespan:900, speed:{min:180,max:320}, angle:{min:30,max:65}, scale:{start:0.9,end:0.5}, alpha:{start:1,end:.4}, tint:[0xd8a850,0xb88820,0xf0c870], gravityY:980, rotate:{min:0,max:720}, emitting:false, maxParticles:40 }).setDepth(60);
@@ -2010,7 +2012,20 @@ class Battle extends Phaser.Scene {
       }
       this._lastWeaponTex = tx;
     }
-    if(this.hudWeapon)this.hudWeapon.setText(w.name);
+    // r52: weapon name 加 LV tier marker(LV1 ★ / LV2 ★★ / LV3 ★★★ + 金色 + 阴影)
+    if(this.hudWeapon){
+      const lv = (this._patchedWeapons && this._patchedWeapons[this.weaponIdx]?._lv) || 0;
+      const stars = lv > 0 ? ' ' + '★'.repeat(lv) : '';
+      this.hudWeapon.setText(w.name + stars);
+      this.hudWeapon.setColor(lv === 3 ? '#ffd24a' : '#d8b15a');                        // LV3 max 金更亮
+      if(lv === 3 && !this.hudWeapon._maxedGlow){
+        this.hudWeapon._maxedGlow = true;
+        if(this.hudWeapon.preFX){ this.hudWeapon.preFX.setPadding(8); this.hudWeapon.preFX.addGlow(0xffd24a, 4, 0, false, 0.10, 12); }
+      } else if(lv < 3 && this.hudWeapon._maxedGlow){
+        this.hudWeapon._maxedGlow = false;
+        if(this.hudWeapon.preFX){ this.hudWeapon.preFX.clear(); }
+      }
+    }
     // r24: 武器图标条高亮当前 + r47 LV pips 同步 Armory upgrades
     if(this.hudWBoxes){
       this.hudWBoxes.forEach((r,i)=>{ const on=i===this.weaponIdx;
@@ -2019,6 +2034,7 @@ class Battle extends Phaser.Scene {
         this.hudWLabels[i].setColor(on?'#fff4cc':'#9aa3a0');
       });
       // r47: pips 按 _patchedWeapons[i]._lv 亮(LV 1 亮 1 pip,LV3 全亮)
+      // r52: LV3 max 武器 box 金描边 3px + 加深底色 + 周围 glow
       if(this.hudWLvPips && this._patchedWeapons){
         this.hudWLvPips.forEach((pips, i)=>{
           const lv = this._patchedWeapons[i]?._lv || 0;
@@ -2027,6 +2043,12 @@ class Battle extends Phaser.Scene {
             pip.fillColor = active ? 0xd8b15a : 0x3a3a30;
             pip.setAlpha(active ? 1 : 0.55);
           });
+          // r52: LV3 max box 金描边覆盖 r24 高亮
+          if(lv === 3 && this.hudWBoxes[i]){
+            const on = i === this.weaponIdx;
+            this.hudWBoxes[i].setStrokeStyle(3, 0xffd24a);
+            this.hudWBoxes[i].fillColor = on ? 0x4a3818 : 0x2a2010;
+          }
         });
       }
     }
@@ -2177,6 +2199,12 @@ class Battle extends Phaser.Scene {
       this.bloods.emitParticleAt(px,py, head?22:11);
       this.clothShred.emitParticleAt(px+Math.cos(_ang)*8, py+Math.sin(_ang)*8, head?2:4);
       if(head) this.fleshChunk.emitParticleAt(px,py,8);
+      // r52: 金色 spark burst 命中确认(head 更亮)
+      if(this.hitSpark){
+        const n = head ? 14 : 7;
+        this.hitSpark.particleScale = head ? {start:1.3, end:0.1} : {start:0.85, end:0.1};
+        this.hitSpark.emitParticleAt(px, py, n);
+      }
       hit.spr.setTintFill(0xffffff); this.time.delayedCall(40,()=>{ if(!hit.dead)hit.spr.setTint(hit.cfg.tint); });
       this.dmgFloat(px+rnd(-8,8), py-6, dmg, head, hit.cfg && hit.cfg.boss);
       if(head){ AudioFX.headshot();        // r22: HEADSHOT 标签由 dmgFloat crit 内置,移除冗余 floatText
