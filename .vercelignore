@@ -14,7 +14,11 @@ node_modules/
 assets/anim/leviathan-raw/
 assets/anim/leviathan-raw-v2/
 assets/portrait/
+assets/codex-raw/
 assets/*.raw.png
+
+# Private backups / drafts (not for repo)
+*.userversion
 
 # Historical cutscene backups
 assets/cutscene/*.bak-r28

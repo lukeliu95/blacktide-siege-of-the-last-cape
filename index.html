@@ -90,6 +90,28 @@
 <div id="grain"></div>
 <div class="rec" id="rec"><span class="dot"></span> BLACKTIDE · CYCLE 9</div>
 
+<!-- r34: Loading splash · Phaser preload 期间显,加载完淡出转 #title -->
+<div id="splash" style="position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at center,#0a1014 0%,#02050a 100%);
+  transition:opacity .9s ease;opacity:1;pointer-events:auto;color:#c8b888">
+  <div style="font-family:'Black Ops One',cursive;font-size:clamp(40px,7vw,84px);letter-spacing:6px;color:#fff4cc;
+    text-shadow:0 4px 30px rgba(0,0,0,.95),0 0 80px rgba(216,177,90,.18);line-height:1">
+    BLACKTIDE
+  </div>
+  <div style="font-family:'Oswald',sans-serif;font-size:clamp(12px,1.4vw,16px);letter-spacing:8px;color:#d8b15a;margin-top:18px;text-transform:uppercase">
+    Siege of the Last Cape
+  </div>
+  <div style="font-family:'Courier New',monospace;font-size:clamp(11px,1.2vw,13px);color:#8a9088;margin-top:42px;max-width:560px;text-align:center;font-style:italic;padding:0 26px;line-height:1.6">
+    — Field Log · "Every hundred years the cursed sea rises and the drowned come back to take the shore. Hold the trigger. Hold the Cape."
+  </div>
+  <div style="margin-top:62px;width:280px;height:3px;background:rgba(216,177,90,.16);border-radius:2px;overflow:hidden">
+    <div id="splashBar" style="width:0%;height:100%;background:linear-gradient(90deg,#a07020,#d8b15a);transition:width .18s ease"></div>
+  </div>
+  <div id="splashTxt" style="font-family:'Oswald',sans-serif;font-size:10px;letter-spacing:5px;color:#6a7068;margin-top:14px;text-transform:uppercase">
+    Loading Cycle 9 archives · 0%
+  </div>
+</div>
+
 <div class="overlay" id="title">
   <video id="introVid" autoplay muted loop playsinline poster="assets/intro-poster.jpg">
     <source src="assets/intro.mp4" type="video/mp4">
@@ -99,8 +121,31 @@
   <div class="sub">Cycle 9 Begins · Marshal Eisen's Stand</div>
   <div class="lede">Every hundred years the cursed sea rises and the drowned come back to take the shore.
     You are Marshal Eisen, commander of the world's last bastion. Hold the trigger. Survive ten waves. Hold the Cape.</div>
+  <button class="cta hidden" id="resumeBtn" style="background:#3a3a30;color:#fff4cc;margin-top:14px"></button>
   <button class="cta" id="startBtn">▶ Enter the Battlefield</button>
+  <button class="cta" id="codexBtn" style="background:#2a2820;color:#d8b15a;margin-top:14px;font-size:16px;padding:12px 32px">📖 FIELD ARCHIVE</button>
+  <button class="cta" id="armoryBtn" style="background:#2a2820;color:#d8b15a;margin-top:10px;font-size:16px;padding:12px 32px">🔧 ARMORY · <span id="armoryBtnCredits">0</span> CREDITS</button>
   <div class="controls"><b>Mouse</b> Aim · <b>Hold LMB</b> Fire · <b>1-4</b> Switch Weapon · <b>R</b> Reload · <b>P</b> Pause</div>
+</div>
+
+<!-- r40: Codex Archive menu — 玩家主动浏览已见怪物档案,未见显 ? 占位 -->
+<div class="overlay hidden" id="codexMenu" style="background:radial-gradient(ellipse at center,#0c1014 0%,#02050a 100%);justify-content:flex-start;padding-top:48px">
+  <div style="font-family:'Black Ops One',cursive;font-size:clamp(28px,4vw,48px);letter-spacing:8px;color:#fff4cc;text-shadow:0 0 18px rgba(216,177,90,.4)">CYCLE 9 · FIELD ARCHIVE</div>
+  <div style="font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:6px;color:#d8b15a;margin-top:10px;text-transform:uppercase">◆ Drowned Bestiary · Encountered Threats ◆</div>
+  <div id="codexGrid" style="display:grid;grid-template-columns:repeat(3,180px);gap:18px;margin-top:32px;max-width:594px"></div>
+  <!-- r44: Achievement section -->
+  <div style="margin-top:24px;font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:5px;color:#ffd24a;text-transform:uppercase">◆ Achievements · Cycle Trophies ◆</div>
+  <div id="achievementGrid" style="display:grid;grid-template-columns:repeat(3,180px);gap:10px;margin-top:14px;max-width:594px"></div>
+  <button class="cta" id="codexBackBtn" style="margin-top:30px;background:#3a3a30;color:#c3c8c4;padding:12px 36px;font-size:15px">↩ BACK TO TITLE</button>
+</div>
+
+<!-- r43: Armory upgrade tree — meta-progression 武器升级菜单 -->
+<div class="overlay hidden" id="armoryMenu" style="background:radial-gradient(ellipse at center,#0c1014 0%,#02050a 100%);justify-content:flex-start;padding-top:42px">
+  <div style="font-family:'Black Ops One',cursive;font-size:clamp(28px,4vw,44px);letter-spacing:8px;color:#fff4cc;text-shadow:0 0 18px rgba(216,177,90,.4)">🔧 ARMORY · MARSHAL'S WORKBENCH</div>
+  <div style="font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:5px;color:#d8b15a;margin-top:8px;text-transform:uppercase">◆ Spend Cycle Credits · Carry upgrades into the next cycle ◆</div>
+  <div style="margin-top:14px;font-family:'Black Ops One',cursive;font-size:22px;color:#ffd24a">CREDITS · <span id="armoryCredits">0</span></div>
+  <div id="armoryGrid" style="display:grid;grid-template-columns:repeat(2,300px);gap:18px;margin-top:24px;max-width:618px"></div>
+  <button class="cta" id="armoryBackBtn" style="margin-top:30px;background:#3a3a30;color:#c3c8c4;padding:12px 36px;font-size:15px">↩ BACK TO TITLE</button>
 </div>
 
 <div class="overlay hidden" id="over">
@@ -109,6 +154,7 @@
   <div class="stat-line">Held to Wave <span class="big" id="overWave">1</span> · Kills <span class="big" id="overKills">0</span></div>
   <div class="stat-line">Score <span class="big" id="overScore">0</span></div>
   <div class="stat-line" id="overBest" style="font-weight:300;color:#9aa3a0;font-size:15px"></div>
+  <div id="overTop5" style="margin-top:18px;max-width:520px"></div>
   <div style="display:flex;gap:14px;margin-top:18px;flex-wrap:wrap;justify-content:center">
     <button class="cta" id="retrySectorBtn" style="background:#a01e1e;color:#fff4cc">↻ RESTART SECTOR <span id="overLevel">1</span></button>
     <button class="cta" id="retryBtn">↻ Restart Cycle 9</button>
@@ -123,6 +169,7 @@
 <div class="overlay hidden" id="cutscene">
   <video id="cutsceneVid" muted playsinline></video>
   <div class="scrim"></div>
+  <div id="cutRank" style="font-family:'Black Ops One',cursive;font-size:clamp(28px,4vw,52px);letter-spacing:6px;color:#d8b15a;text-shadow:0 0 24px rgba(216,177,90,.5),0 3px 18px rgba(0,0,0,.9);margin-bottom:14px;opacity:0;position:relative;z-index:2">◆ RANK A ◆</div>
   <div class="title" id="cutTitle">Sector Secured</div>
   <div class="sub" id="cutSubLabel">SECTOR SECURED</div>
   <div class="stat-line" id="cutSub" style="margin-top:18px"></div>
@@ -170,7 +217,7 @@
 <div id="eisenWrap" style="position:fixed;left:50%;bottom:11vh;transform:translateX(-50%);z-index:8;
   pointer-events:none;opacity:0;transition:opacity .35s ease;max-width:80vw;
   background:linear-gradient(180deg,rgba(8,12,14,.85),rgba(8,12,14,.78));
-  border:1px solid #d8b15a;border-left:4px solid #d8b15a;border-right:4px solid #d8b15a;
+  border:1px solid #d8b15a;
   box-shadow:0 4px 24px rgba(0,0,0,.6),inset 0 0 0 1px rgba(216,177,90,.18);
   padding:6px 22px 12px;min-width:380px;text-align:left;display:flex;align-items:stretch;gap:14px">
   <!-- r30: Marshal Eisen portrait(96x120 thumbnail · 字幕电报区左侧 · BLACKTIDE 古代石堡指挥官) -->
@@ -188,6 +235,44 @@
     <div id="eisenLine" style="font-family:'Courier New',monospace;font-weight:700;color:#fff4cc;
       font-size:clamp(14px,1.7vw,20px);letter-spacing:2px;line-height:1.4;min-height:1.4em;
       text-shadow:0 1px 6px rgba(0,0,0,.85)"></div>
+  </div>
+</div>
+
+<!-- r44: Achievement unlock banner(右上角 slide-in 2.4s,金色双层闪) -->
+<div id="achievementCard" style="position:fixed;top:14vh;right:-420px;z-index:9;
+  pointer-events:none;width:380px;
+  background:linear-gradient(180deg,rgba(48,36,16,.96),rgba(36,28,12,.98));
+  border:1px solid #a07020;
+  box-shadow:0 4px 32px rgba(216,177,90,.4),inset 0 0 0 1px rgba(255,210,74,.32);
+  padding:12px 16px;display:flex;gap:12px;
+  transition:right .42s cubic-bezier(.22,1,.36,1), opacity .25s ease;opacity:0">
+  <div id="achievementIcon" style="flex:0 0 auto;width:64px;height:64px;display:flex;align-items:center;justify-content:center;font-size:38px;background:radial-gradient(circle,rgba(255,210,74,.22),transparent 70%);border:1px solid rgba(216,177,90,.4);border-radius:50%"></div>
+  <div style="display:flex;flex-direction:column;justify-content:center;flex:1;min-width:0">
+    <div style="font-family:'Oswald',sans-serif;font-size:9px;color:#ffd24a;letter-spacing:4px;text-transform:uppercase;margin-bottom:3px">◆ Achievement Unlocked ◆</div>
+    <div id="achievementName" style="font-family:'Black Ops One',cursive;font-size:18px;color:#fff4cc;letter-spacing:2px;line-height:1.1;margin-bottom:3px"></div>
+    <div id="achievementDesc" style="font-family:'Courier New',monospace;font-size:11px;color:#c8b888;line-height:1.4;font-style:italic"></div>
+  </div>
+</div>
+
+<!-- r32: Cycle 9 Codex first-encounter dossier(右上角 slide-in 1.8s 自动消失,不打断战斗) -->
+<div id="codexCard" style="position:fixed;top:14vh;right:-380px;z-index:9;
+  pointer-events:none;width:340px;
+  background:linear-gradient(180deg,rgba(36,28,18,.94),rgba(28,22,14,.96));
+  border:1px solid #6a5028;
+  box-shadow:0 4px 28px rgba(0,0,0,.7),inset 0 0 0 1px rgba(216,177,90,.22);
+  padding:10px 14px;display:flex;gap:12px;
+  transition:right .42s cubic-bezier(.22,1,.36,1), opacity .25s ease;opacity:0">
+  <img id="codexImg" src="assets/codex/codex_soldier.png" alt="dossier"
+       style="flex:0 0 auto;width:92px;height:auto;align-self:center;display:block;
+              filter:drop-shadow(0 2px 6px rgba(0,0,0,.7));
+              border-right:1px solid rgba(216,177,90,.25);padding-right:10px">
+  <div style="display:flex;flex-direction:column;justify-content:center;flex:1;min-width:0">
+    <div style="font-family:'Oswald',sans-serif;font-size:9px;color:#c89850;letter-spacing:4px;text-transform:uppercase;margin-bottom:4px">
+      ◆ Field Intel · Cycle 9 Archive
+    </div>
+    <div id="codexName" style="font-family:'Black Ops One',cursive;font-size:18px;color:#fff4cc;letter-spacing:2px;line-height:1.1;margin-bottom:3px"></div>
+    <div id="codexThreat" style="font-family:'Oswald',sans-serif;font-size:10px;color:#c64b3a;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px"></div>
+    <div id="codexLore" style="font-family:'Courier New',monospace;font-size:11px;color:#c8b888;line-height:1.4;font-style:italic"></div>
   </div>
 </div>
 
@@ -220,6 +305,119 @@ const AudioFX = (() => {
     }
     return _masterLP;
   };
+  // r32: 场景特化混响 IR + ambience bed(5 场景:beach/night/seawall/trench/ruins)
+  // 每场景:IR 长度 / 衰减 shape / wet level 各异 + ambience noise bed(filter特色化)
+  const SCENE_AC = [
+    { irLen:1.8, decay:2.2, wet:0.18, ambFreq:280,  ambQ:0.4, ambGain:0.10 },   // 0 beach 开阔海岸 长+明亮+海风
+    { irLen:1.4, decay:1.8, wet:0.22, ambFreq:140,  ambQ:0.6, ambGain:0.11 },   // 1 night/cove 雾闷+低吼
+    { irLen:2.4, decay:2.6, wet:0.28, ambFreq:1800, ambQ:0.3, ambGain:0.08 },   // 2 seawall 石回响+铁滴水
+    { irLen:1.0, decay:1.6, wet:0.15, ambFreq:180,  ambQ:0.5, ambGain:0.09 },   // 3 trench 泥水沉+风
+    { irLen:3.2, decay:2.8, wet:0.34, ambFreq:520,  ambQ:0.4, ambGain:0.12 },   // 4 ruins 大教堂回响+远墓钟
+  ];
+  let _currentSceneIdx = -1;
+  let _ambSource = null, _ambGain = null;
+  function _makeSceneIR(a, cfg){
+    const irLen=Math.floor(a.sampleRate*cfg.irLen), irBuf=a.createBuffer(2,irLen,a.sampleRate);
+    for(let ch=0;ch<2;ch++){ const d=irBuf.getChannelData(ch);
+      for(let i=0;i<irLen;i++){ const t=i/irLen; d[i]=(Math.random()*2-1)*Math.pow(1-t,cfg.decay)*0.55; } }
+    return irBuf;
+  }
+  function setSceneAcoustic(idx){
+    const a=ensure(); if(!a)return;
+    if(idx===_currentSceneIdx)return;
+    bus(a);                                                            // 确保 _reverb 已初始化
+    const cfg = SCENE_AC[idx] || SCENE_AC[0];
+    if(_reverb){ _reverb.buffer = _makeSceneIR(a, cfg); }
+    if(_reverbGain){ _reverbGain.gain.setTargetAtTime(cfg.wet, a.currentTime, 0.5); }
+    _currentSceneIdx = idx;
+    // ambience bed crossfade
+    const t = a.currentTime;
+    if(_ambGain){
+      _ambGain.gain.setTargetAtTime(0, t, 0.4);
+      const oldSrc = _ambSource;
+      setTimeout(()=>{ try{ oldSrc && oldSrc.stop(); }catch(e){} }, 1200);
+    }
+    // 新 ambience:noise 4s loop + filter + 慢淡入
+    const buf = a.createBuffer(1, Math.floor(a.sampleRate*4), a.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i] = (Math.random()*2-1)*0.45;
+    const src = a.createBufferSource(); src.buffer = buf; src.loop = true;
+    const f = a.createBiquadFilter(); f.type = 'lowpass';
+    f.frequency.value = cfg.ambFreq; f.Q.value = cfg.ambQ;
+    const g = a.createGain(); g.gain.value = 0;
+    src.connect(f).connect(g).connect(bus(a));
+    try{ src.start(); }catch(e){}
+    g.gain.setTargetAtTime(cfg.ambGain, t+0.05, 0.4);
+    _ambSource = src; _ambGain = g;
+    // r35: Scene[4] ruins 大教堂专属 chime + choir overlay,离开则停
+    if(idx === 4){
+      if(!_choirSrc) _startCathedralOverlay();
+    } else {
+      if(_cathedralChimeTimer){ clearTimeout(_cathedralChimeTimer); _cathedralChimeTimer = null; }
+      if(_choirGain){
+        _choirGain.gain.setTargetAtTime(0, t, 0.5);
+        const oldChoir = _choirSrc;
+        setTimeout(()=>{ try{ oldChoir && oldChoir.stop(); }catch(e){} }, 1500);
+        _choirSrc = null; _choirGain = null;
+      }
+    }
+  }
+  function stopSceneAmbience(){
+    const a=ensure(); if(!a||!_ambGain)return;
+    _ambGain.gain.setTargetAtTime(0, a.currentTime, 0.3);
+    const oldSrc = _ambSource;
+    setTimeout(()=>{ try{ oldSrc && oldSrc.stop(); }catch(e){} _ambSource=null; _ambGain=null; }, 1000);
+    _currentSceneIdx = -1;
+    if(_cathedralChimeTimer){ clearTimeout(_cathedralChimeTimer); _cathedralChimeTimer = null; }
+    if(_choirGain){ const a2=ensure(); if(a2) _choirGain.gain.setTargetAtTime(0, a2.currentTime, 0.4); setTimeout(()=>{ try{ _choirSrc && _choirSrc.stop(); }catch(e){} _choirSrc=null; _choirGain=null; }, 1100); }
+  }
+  // r35: Scene[4] ruins(大教堂)专属 audio overlay — 偶发钟声 + 远人声合唱
+  let _cathedralChimeTimer = null, _choirSrc = null, _choirGain = null;
+  function _startCathedralOverlay(){
+    const a=ensure(); if(!a)return;
+    // distant choir 持续音床:noise → bandpass 800Hz(人声共振)+ LFO 慢调制 + 长 reverb 拖尾
+    const buf = a.createBuffer(1, Math.floor(a.sampleRate*6), a.sampleRate);
+    const d = buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i] = (Math.random()*2-1) * 0.35;
+    const src = a.createBufferSource(); src.buffer = buf; src.loop = true;
+    const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 820; bp.Q.value = 4.5;
+    // LFO 慢调制 0.3Hz 让 choir 有呼吸感
+    const lfo = a.createOscillator(); lfo.frequency.value = 0.3;
+    const lfoGain = a.createGain(); lfoGain.gain.value = 180;
+    lfo.connect(lfoGain).connect(bp.frequency);
+    try{ lfo.start(); }catch(e){}
+    const g = a.createGain(); g.gain.value = 0;
+    src.connect(bp).connect(g).connect(bus(a));
+    try{ src.start(); }catch(e){}
+    g.gain.setTargetAtTime(0.045, a.currentTime+0.1, 1.2);                   // 极轻,沉浸不抢戏
+    _choirSrc = src; _choirGain = g;
+    // 偶发教堂钟声:每 9-16s 触发一次
+    function scheduleChime(){
+      _cathedralChimeTimer = setTimeout(()=>{
+        _cathedralChime();
+        scheduleChime();
+      }, 9000 + Math.random()*7000);
+    }
+    scheduleChime();
+  }
+  function _cathedralChime(){
+    const a=ensure(); if(!a)return; const t=a.currentTime;
+    // 主钟 220Hz triangle + sub 110Hz sine,长 envelope 3s decay,过 _reverb 拖尾
+    const main = a.createOscillator(), mg = a.createGain();
+    main.type = 'triangle'; main.frequency.value = 220;
+    mg.gain.setValueAtTime(0, t); mg.gain.linearRampToValueAtTime(0.32, t+0.012); mg.gain.exponentialRampToValueAtTime(0.001, t+3.0);
+    main.connect(mg).connect(bus(a)); main.start(t); main.stop(t+3.2);
+    // sub 加厚
+    const sub = a.createOscillator(), sg = a.createGain();
+    sub.type = 'sine'; sub.frequency.value = 110;
+    sg.gain.setValueAtTime(0, t); sg.gain.linearRampToValueAtTime(0.22, t+0.020); sg.gain.exponentialRampToValueAtTime(0.001, t+2.8);
+    sub.connect(sg).connect(bus(a)); sub.start(t); sub.stop(t+3.0);
+    // 高泛音 660Hz sine 短暂叮(0.5s)
+    const high = a.createOscillator(), hg = a.createGain();
+    high.type = 'sine'; high.frequency.value = 660;
+    hg.gain.setValueAtTime(0, t); hg.gain.linearRampToValueAtTime(0.10, t+0.008); hg.gain.exponentialRampToValueAtTime(0.001, t+0.5);
+    high.connect(hg).connect(bus(a)); high.start(t); high.stop(t+0.55);
+  }
   // r28: perspective-aware stereo panning — DW_REF is the world width used to map x → pan
   let DW_REF = 1280;
   function setWorldWidth(w){ if(w>0) DW_REF = w; }
@@ -506,7 +704,7 @@ const AudioFX = (() => {
        const m=localStorage.getItem('bt_mute'); if(m==='1')_muted=true; }catch(e){}
   return {
     setMasterVolume, setMuted, getMasterVolume, getMuted, _applyVol,
-    telegraphDit, heartbeat, setWorldWidth, panTo, levelStinger, bossStinger,
+    telegraphDit, heartbeat, setWorldWidth, panTo, levelStinger, bossStinger, setSceneAcoustic, stopSceneAmbience,
     diveIn, diveOut, bossRoar, bossHit, bossPhase, bossDeath,
     headshot, ammoPickup, healPickup, boostPickup, reloadDone, lowAmmoTick, bgmCrossfade,
     startBGM, stopBGM, roar,
@@ -582,11 +780,12 @@ const WEAPONS = [
 ];
 // 场景注册表(每 3 波切换 · 缺贴图自动跳过)
 const SCENES = [
-  { key:'bg',         name:'Last Cape · Dawn',         tint:0xcfd8da },
-  { key:'bg_night',   name:'Black Cove · Flares',      tint:0xb8c0d8 },
-  { key:'bg_seawall', name:'Iron Seawall · Fog',       tint:0xc8d2d4 },
-  { key:'bg_trench',  name:'Sandbag Trench · Dusk',    tint:0xc6cfd8 },
-  { key:'bg_ruins',   name:'Cathedral Ruins · Vigil',  tint:0xc8c0bc },
+  // r39: 场景特化 LUT overlay(全屏 rect MULTIPLY 着色,模拟 ColorMatrix tone)
+  { key:'bg',         name:'Last Cape · Dawn',         tint:0xcfd8da, lutColor:0xffe8b8, lutAlpha:0.08 }, // 暖暮金
+  { key:'bg_night',   name:'Black Cove · Flares',      tint:0xb8c0d8, lutColor:0x7080c0, lutAlpha:0.18 }, // 冷紫蓝
+  { key:'bg_seawall', name:'Iron Seawall · Fog',       tint:0xc8d2d4, lutColor:0xc8d0d8, lutAlpha:0.14 }, // 雾灰
+  { key:'bg_trench',  name:'Sandbag Trench · Dusk',    tint:0xc6cfd8, lutColor:0x8c7050, lutAlpha:0.13 }, // 泥棕
+  { key:'bg_ruins',   name:'Cathedral Ruins · Vigil',  tint:0xc8c0bc, lutColor:0x9098a8, lutAlpha:0.20 }, // 灰蓝
 ];
 // 10 章节叙事(每关固定章节名 + 关-场景映射,故事推进)
 const CHAPTERS = [
@@ -616,7 +815,27 @@ const EPIGRAPHS = [
   { roman:'IX',   sub:'THE FINAL BEACH',            quote:'One wall. One marshal. One hundred years of held ground.' },
   { roman:'X',    sub:'LEVIATHAN OF THE BLACK TIDE',quote:'Cycle 9 ends tonight. The Leviathan or me. Not both.' },
 ];
-// Marshal Eisen 战场对白(章节起/BOSS 出场/濒死/胜利)
+// r32+r41: Cycle 9 Codex 9 档案数据(7 grunt + 2 BOSS · first-encounter 右上角 slide-in)
+const CODEX = {
+  soldier:  { name:'Drowned Infantryman',  threat:'Threat · Common',     lore:'Standard. Mass. Slow. Many.' },
+  runner:   { name:'Drowned Runner',       threat:'Threat · Frenzy',     lore:'Hunched. Frenzied. Closes ground fast.' },
+  elite:    { name:'Drowned Vanguard',     threat:'Threat · Commander',  lore:'Robed officer. Tougher. Issues the march.' },
+  brute:    { name:'Drowned Brute',        threat:'Threat · Heavy',      lore:'Twice human size. One claw. Will not stop.' },
+  spitter:  { name:'Drowned Spitter',      threat:'Threat · Ranged',     lore:'Bile sac swells. Spits from the surf line.' },
+  exploder: { name:'Drowned Husk',         threat:'Threat · Suicide',    lore:'Cracked shell. Unstable. Stays back from groups.' },
+  armored:  { name:'Drowned Bulwark',      threat:'Threat · Bulwark',    lore:'Welded into kettle plate. Aim for the visor.' },
+  tidelord: { name:'The Tidelord',         threat:'Threat · BOSS V · APEX',     lore:'Drowned king of Cycle 9. Crown of barnacle. Broken trident. Wakes at the fifth toll.' },
+  leviathan:{ name:'Leviathan of the Black Tide', threat:'Threat · BOSS X · APEX', lore:'The final form. No face. No mercy. Cycle ends or it ends us.' },
+};
+// r44: Achievement 系统 — 6 个核心成就,localStorage 持久化跨 run,触发时金色 banner + Archive 内显
+const ACHIEVEMENTS = [
+  { id:'first_blood',     icon:'⚔', name:'First Blood',      desc:'Kill your first drowned.' },
+  { id:'survivor',        icon:'🛡', name:'Survivor',         desc:'Hold Sector I to the end.' },
+  { id:'cycle_holds',     icon:'★', name:'Cycle Holds',      desc:'Survive all ten sectors. End Cycle 9.' },
+  { id:'legend_combo',    icon:'☠', name:'Legend · ×100',    desc:'Reach a 100-kill chain in one run.' },
+  { id:'bestiary',        icon:'📖', name:'Cycle 9 Bestiary', desc:'Encounter all nine drowned threats.' },
+  { id:'arsenal_master',  icon:'🔧', name:'Arsenal Master',   desc:'Max all four weapons at the Armory.' },
+];
 const EISEN_LINES = {
   chapter:[null,
     "Hold the toll.",
@@ -632,7 +851,16 @@ const EISEN_LINES = {
   ],
   bossEntrance:{ tidelord:"I dreamed of you, Tidelord.", leviathan:"You woke the sea. I end it." },
   lowHealth:["Bunker's bleeding.","One more wave. One more.","Not today. Not Cycle 9."],
-  finalVictory:"Cycle 9 holds."
+  finalVictory:"Cycle 9 holds.",
+  // r40: 中场战术电报池(按战况触发,_maybeMidbattleLine 节流)
+  midbattle:{
+    bruteHeavy:  ["Brute on the line. Aim for the chest.",     "Heavy ahead. Don't waste rifle rounds."],
+    spitterSeen: ["Spitter at the surf. Flank it before it spits.", "Ranged threat — strafe wide."],
+    ammoLow:     ["Ammo's thin. Conserve. Supply incoming.",   "Watch your reload window."],
+    bunkerCrit:  ["Wall's cracking. Fall the front line first.","Hold. Just hold."],
+    bossPhase2:  ["It's not dying — it's waking up.",            "Phase shift. Don't blink."],
+    bossPhase3:  ["This is the last form. Make it count.",       "End it. End it now."],
+  },
 };
 // 怪物走路序列帧(图生视频管线 · 缺失类型回退静态+程序化步态)
 const WALK_SHEETS = [
@@ -660,6 +888,15 @@ class Battle extends Phaser.Scene {
     WALK_SHEETS.forEach(w=>this.load.spritesheet(w.key, w.file, { frameWidth:w.fw, frameHeight:w.fh }));
     // 新怪物 / 新武器 / 新场景(子 agent 异步生成 · 缺失则优雅降级,不刷错)
     this.load.on('loaderror', ()=>{});
+    // r34: splash 进度条 + 加载完淡出
+    const bar=document.getElementById('splashBar'), txt=document.getElementById('splashTxt'), splash=document.getElementById('splash');
+    if(bar && splash){
+      this.load.on('progress', v=>{ const p=Math.round(v*100); bar.style.width=p+'%'; txt.textContent='Loading Cycle 9 archives · '+p+'%'; });
+      this.load.on('complete', ()=>{
+        if(txt) txt.textContent='Cycle 9 ready · enter the cape';
+        setTimeout(()=>{ splash.style.opacity='0'; setTimeout(()=>{ splash.style.display='none'; }, 950); }, 320);
+      });
+    }
     ['exploder','spitter','armored'].forEach(k=>this.load.image('z_'+k,'assets/zombie-'+k+'.png'));
     ['shotgun','rifle','flamer'].forEach(k=>this.load.image('gun_'+k,'assets/gun-'+k+'.png'));
     this.load.image('bg_night','assets/bg-night.png');
@@ -673,6 +910,9 @@ class Battle extends Phaser.Scene {
     ['ammo','heal','boost'].forEach(k=>this.load.image('sup_'+k,'assets/supplies/sup-'+k+'.png'));
     this.load.image('z_boss_tidelord','assets/boss-tidelord.png');
     this.load.image('z_boss_leviathan','assets/boss-leviathan.png');
+    // r32+r41: Cycle 9 Codex 9 档案(7 grunt + 2 BOSS)
+    ['soldier','runner','elite','brute','spitter','exploder','armored','tidelord','leviathan'].forEach(t =>
+      this.load.image('codex_'+t, 'assets/codex/codex_'+t+'.png'));
     // r28: Leviathan 8 帧多角度动画 sprite sheet (4 列 x 2 行 / 单 cell 360x360)
     this.load.spritesheet('z_boss_leviathan_anim','assets/leviathan-anim-sheet.png',{frameWidth:360,frameHeight:360});
   }
@@ -709,6 +949,8 @@ class Battle extends Phaser.Scene {
     this.clothShred = this.add.particles(0,0,'spark',{ lifespan:1400, speed:{min:40,max:160}, scale:{start:0.8,end:0}, alpha:{start:.8,end:0}, tint:[0x4a3a28,0x6a5040,0x3a2a1c], gravityY:220, emitting:false, maxParticles:80 }).setDepth(82);
     // r22: 枪口烟雾(NORMAL blend,上升)+ 弹壳抛出(金黄,下落)
     this.muzzleSmoke = this.add.particles(0,0,'spark',{ lifespan:520, speed:{min:18,max:55}, speedY:{min:-90,max:-40}, scale:{start:0.9,end:2.4}, alpha:{start:0.35,end:0}, tint:[0xcfd0d2,0xa8acae,0x6a6e72], gravityY:-30, emitting:false, blendMode:'NORMAL', maxParticles:60 }).setDepth(58);
+    // r42: Combo heat trail — combo ≥ 15 时枪口持续小火苗拖尾(combo 越高 emit 越密 + 色越红)
+    this.heatTrail = this.add.particles(0,0,'spark',{ lifespan:680, speedY:{min:-160,max:-80}, speedX:{min:-22,max:22}, scale:{start:1.3,end:0.2}, alpha:{start:0.85,end:0}, tint:[0xffd24a, 0xff8c2a], gravityY:-180, emitting:false, blendMode:'ADD', frequency:2000, maxParticles:80 }).setDepth(60);
     this.shellEject = this.add.particles(0,0,'spark',{ lifespan:900, speed:{min:180,max:320}, angle:{min:30,max:65}, scale:{start:0.9,end:0.5}, alpha:{start:1,end:.4}, tint:[0xd8a850,0xb88820,0xf0c870], gravityY:980, rotate:{min:0,max:720}, emitting:false, maxParticles:40 }).setDepth(60);
 
     // 雨
@@ -750,6 +992,8 @@ class Battle extends Phaser.Scene {
       tex.getContext().fillStyle=g; tex.getContext().fillRect(0,0,DW,DH); tex.refresh();
     }
     this.critVig = this.add.image(DW/2,DH/2,'crit_vig').setDepth(74).setAlpha(0).setBlendMode('MULTIPLY');
+    // r39: 场景特化 LUT overlay(MULTIPLY 染色,depth 在 vignette 之下不挡 HUD)
+    this.sceneLut = this.add.rectangle(DW/2,DH/2,DW,DH, 0xffe8b8, 0.08).setDepth(70).setBlendMode('MULTIPLY');
 
     // 准星
     this.cross = this.add.image(DW/2,DH/2,'cross').setDepth(80);
@@ -820,6 +1064,9 @@ class Battle extends Phaser.Scene {
     this.hudScore = this.add.text(24,18,'00000',{...F,fontSize:'30px',fontStyle:'600',color:'#e7e6df'}).setDepth(90);
     this.add.text(24,54,'SCORE',{...F,fontSize:'12px',color:'#9aa3a0'}).setDepth(90).setLetterSpacing?.(2);
     this.hudWave = this.add.text(DW/2,20,'Wave 1',{fontFamily:'"Black Ops One"',fontSize:'26px',color:'#d8b15a'}).setOrigin(0.5,0).setDepth(90);
+    // r42+r43-fix: wave countdown ring — 挪到血条下方避覆盖(cy 84 在 hpFill cy 60 + 24 间距)
+    this.waveRing = this.add.graphics().setDepth(91);
+    this.waveRingTxt = this.add.text(DW-50, 84, '', {fontFamily:'"Black Ops One",cursive', fontSize:'14px', color:'#d8b15a'}).setOrigin(0.5).setDepth(92);
     this.hudCombo = this.add.text(DW/2,56,'',{...F,fontSize:'16px',fontStyle:'600',color:'#ff8c52'}).setOrigin(0.5,0).setDepth(90);
     // r26: 连击徽章(combo>=5 显)— 大字 ×N + 衰减进度环 + 倍率
     this.comboBadge = this.add.container(DW/2, 130).setDepth(91).setVisible(false);
@@ -907,6 +1154,17 @@ class Battle extends Phaser.Scene {
     this.reloading=false; this.reloadT=0; this.cooldown=0;
     this.syncWeapon();
     this.sceneIdx=0; if(this.bgImg){ const b=this.bgImg; b.setTexture('bg'); const sc=Math.max(DW/b.width,DH/b.height); b.setScale(sc); b.setTint(SCENES[0].tint); }
+    AudioFX.setSceneAcoustic && AudioFX.setSceneAcoustic(0);                  // r32: 初始场景声学
+    this._setSceneLut && this._setSceneLut(0);                                // r39: 初始 LUT(暖暮金)
+    // r35: Adaptive Quality Scaler — rolling FPS 监控 + 自动 LOW/NORMAL mode
+    this._fpsHistory = [];                                                    // 最近 60 帧 fps 滚动窗口
+    this._qualityMode = 'normal';
+    this._aqsLowSinceT = 0; this._aqsNormalSinceT = 0;
+    // 右下 banner 显当前 quality(LOW 显金色,NORMAL 隐)
+    this.aqsBanner = this.add.text(DW-18, DH-92, '', {fontFamily:'"Oswald",sans-serif', fontSize:'10px', color:'#d8b15a', fontStyle:'600'}).setOrigin(1,1).setDepth(95);
+    this.aqsBanner.setLetterSpacing && this.aqsBanner.setLetterSpacing(3);
+    // r36: Lifecycle safety net — tab 隐藏自动暂停 + 静音,visible 恢复(防后台耗 CPU + BGM)
+    this._setupLifecycle();
     this.betweenWave=true; this.waveTimer=2.2;
     this.spawnQ=[]; this.spawnT=0; this.waveActive=false;
     this.zombies.forEach(z=>{ z.shadow&&z.shadow.destroy(); z.spr.destroy(); }); this.zombies=[];
@@ -931,7 +1189,16 @@ class Battle extends Phaser.Scene {
     this.input.on('wheel',(p,go,dx,dy)=>{ if(this.state!=='play')return; this.switchWeapon((this.weaponIdx+(dy>0?1:WEAPONS.length-1))%WEAPONS.length); });
   }
 
-  startGame(){ this.resetState(); this.state='play'; AudioFX.wave();
+  startGame(opts){ this.resetState(); this.state='play'; AudioFX.wave();
+    this._rebuildWeaponCache && this._rebuildWeaponCache();                  // r43: Armory upgrades 应用
+    // r38: resume — opts={level,score,kills,best} 从存档还原(否则全新开局)
+    if(opts && opts.level && opts.level>=1 && opts.level<=10){
+      this.level = opts.level;
+      this.score = opts.score || 0;
+      this.kills = opts.kills || 0;
+      if(opts.best) this.best = opts.best;
+      if(this._displayedScore != null) this._displayedScore = this.score;        // 防 score 滚动 tween 误触
+    }
     const tb=document.getElementById('titleBgm'); tb&&tb.pause();
     const bb=document.getElementById('battleBgm');                          // Lyria 真·管弦乐战斗 BGM
     if(bb){ bb.volume=0.55; bb.currentTime=0; bb.play().catch(()=>AudioFX.startBGM()); } else AudioFX.startBGM();
@@ -953,6 +1220,7 @@ class Battle extends Phaser.Scene {
   /* ---------- 波次 ---------- */
   startWave(){
     this.wave++; this.waveInLevel++; this.waveActive=true; this.betweenWave=false;
+    if(this.waveInLevel===1) this._resetMidLineCount && this._resetMidLineCount();      // r40: 每关复位 mid line
     if(this.waveInLevel===1) this.switchToChapterScene();        // 每关首波 = 按章节切场景
     // 5 分钟通关节奏:波数小、密度足、推进快
     const L=this.level, W=this.waveInLevel;
@@ -964,16 +1232,39 @@ class Battle extends Phaser.Scene {
       : L<=7 ? (7 + W*1)              // 中段:8/9/10
       : (10 + W*2);                   // 高潮:12/14/16
     const intervalMul = isFinalPush ? 0.7 : 1.0;                                // FINAL PUSH 压 30% spawn 间隔
+    // r34: L4 / L8 cliff smoothing — 首波"接触波"只放 1 个新兵种代表,其余降级到上一关池
+    const isCliffContact = (L===4 && W===1) || (L===8 && W===1);
     this.spawnQ=[];
     for(let i=0;i<n;i++){
       let t='soldier'; const r=Math.random();
       if(L>=2 && r<0.22) t='runner';
-      if(L>=4 && r>=0.50 && r<0.58) t='spitter';
-      if(L>=4 && r>=0.66 && r<0.76) t='exploder';
-      if(L>=4 && r>=0.76 && r<0.86) t='elite';
-      if(L>=8 && r>=0.86 && r<0.93) t='armored';
-      if(L>=8 && r>=0.93) t='brute';
+      if(isCliffContact){
+        // L4 W=1: 只锁定 L=3 池子(soldier+runner only),屏蔽 spitter/exploder/elite
+        // L8 W=1: 保留 L=7 池子(soldier/runner/spitter/exploder/elite),屏蔽 armored/brute
+        if(L===8){
+          if(r>=0.50 && r<0.58) t='spitter';
+          if(r>=0.66 && r<0.76) t='exploder';
+          if(r>=0.76 && r<0.86) t='elite';
+        }
+        // L4 W=1 故意不解锁任何 L>=4 新兵种,只让玩家接触下面那个强制 spawn 的 spitter
+      } else {
+        if(L>=4 && r>=0.50 && r<0.58) t='spitter';
+        if(L>=4 && r>=0.66 && r<0.76) t='exploder';
+        if(L>=4 && r>=0.76 && r<0.86) t='elite';
+        if(L>=8 && r>=0.86 && r<0.93) t='armored';
+        if(L>=8 && r>=0.93) t='brute';
+      }
       this.spawnQ.push({ t, delay:i*rnd(0.25,0.55)*intervalMul });
+    }
+    // r34: 接触波加 1 个标志新威胁(spawn 中后段插入,给玩家先打几个 soldier 再遇)
+    if(isCliffContact){
+      const threatType = L===4 ? 'spitter' : 'armored';
+      const threatName = L===4 ? 'TOXIC SPITTER' : 'ARMORED BULWARK';
+      this.spawnQ.push({ t:threatType, delay:Math.floor(n*0.6)*rnd(0.30,0.55) });
+      this.time.delayedCall(1200, ()=>{
+        this.showBanner('⚠ NEW THREAT · '+threatName+' ⚠');
+        if(this.edgePulse){ this.edgePulse.setAlpha(0); this.tweens.add({targets:this.edgePulse,alpha:0.45,duration:280,yoyo:true,hold:240,repeat:1,onComplete:()=>this.edgePulse.setAlpha(0)}); }
+      });
     }
     // FINAL PUSH 强制塞精英(L<=4 一个 elite, L>=5 一个 elite + 一个 armored)
     if(isFinalPush){
@@ -1002,6 +1293,188 @@ class Battle extends Phaser.Scene {
     if(boss && bb){ AudioFX.bgmCrossfade(bb, boss, bb.volume, 0.62, 600); }
     else if(boss){ boss.volume=0.62; boss.currentTime=0; boss.play().catch(()=>{}); }
     this.time.delayedCall(1100,()=>this.showEisenLine(EISEN_LINES.bossEntrance[type]));
+    // r33: BOSS escort pool — Tidelord 召 elite+spitter,Leviathan 召 armored+brute
+    z._escortPool = type==='leviathan' ? ['armored','brute'] : ['elite','spitter'];
+    z._escortCap = 4;                                                            // 出场 4 个,phase2 +2,phase3 +4
+    z._escortRespawnT = 0;                                                       // 1s tick 补给
+    // 初始 4 个 escort 围 BOSS 两侧站位(避中央,让 BOSS 突出)
+    const OFFSETS = [-360, -200, 200, 360];
+    OFFSETS.forEach((dx,i) => this.time.delayedCall(280 + i*180, () => {
+      if(!this.activeBoss || this.activeBoss.dead) return;
+      const t = z._escortPool[i % z._escortPool.length];
+      this.spawn(t, {skipTell:true, x: clamp(DW/2 + dx, 60, DW-60)});
+      const e = this.zombies[this.zombies.length-1];
+      if(e){ e.emerge=0; e.roared=true; e._isBossEscort=true; }
+    }));
+  }
+  // r33: adaptive escort 池 — 每 1s 数 escort,缺则补
+  _tickBossEscorts(dt){
+    const z = this.activeBoss; if(!z || z.dead) return;
+    z._escortRespawnT -= dt;
+    if(z._escortRespawnT > 0) return;
+    z._escortRespawnT = 1.0;                                                     // 1s tick
+    const alive = this.zombies.filter(q => !q.dead && q._isBossEscort).length;
+    if(alive >= z._escortCap) return;
+    // 补 1 个(避一次性涌入,每 tick 最多 +1)
+    const t = z._escortPool[(this.kills + alive) % z._escortPool.length];
+    const dx = rnd(-380, 380);
+    this.spawn(t, {skipTell:true, x: clamp(DW/2 + dx, 60, DW-60)});
+    const e = this.zombies[this.zombies.length-1];
+    if(e){ e.emerge=0; e.roared=true; e._isBossEscort=true; }
+  }
+  // r37: Combo milestone bonus — 25 / 50 / 100 递进奖励(edge 闪 + stinger + 100 给 +5000 + LEGEND 全屏)
+  _comboMilestone(n){
+    const TIER = {
+      25:  { name:'★ KILL CHAIN · ×25 ★',   bonus:500,  color:'#d8b15a', bgFlash:0.30, edgePulses:2, stinger:'levelStinger' },
+      50:  { name:'★★ FRENZY · ×50 ★★',    bonus:1500, color:'#ff8c2a', bgFlash:0.55, edgePulses:3, stinger:'bossStinger'  },
+      100: { name:'☠ LEGEND · ×100 · +5000 ☠', bonus:5000, color:'#ff3a2a', bgFlash:1.00, edgePulses:5, stinger:'bossStinger'  },
+    }[n];
+    if(!TIER) return;
+    this.score += TIER.bonus;
+    // edge pulses 多闪
+    if(this.edgePulse){
+      this.edgePulse.setAlpha(0);
+      this.tweens.add({ targets:this.edgePulse, alpha:0.65, duration:160, yoyo:true, hold:120, repeat:TIER.edgePulses-1, onComplete:()=>this.edgePulse.setAlpha(0) });
+    }
+    // 100 时全屏 flash 高强度
+    if(this.flash && TIER.bgFlash>=0.8){
+      this.flash.setAlpha(TIER.bgFlash);
+      this.tweens.add({ targets:this.flash, alpha:0, duration:680 });
+    }
+    // stinger 音效
+    AudioFX[TIER.stinger] && AudioFX[TIER.stinger]();
+    // 屏中央 LEGEND 大字 banner(用现有 banner 但临时上色)
+    if(this.banner){
+      const oldColor = this.banner.style.color;
+      this.banner.setText(TIER.name).setColor(TIER.color).setAlpha(0).setScale(0.5);
+      this.tweens.add({ targets:this.banner, alpha:1, scale:1.0, duration:280, ease:'Back.easeOut' });
+      this.tweens.add({ targets:this.banner, alpha:0, duration:520, delay:1300,
+        onComplete:()=>{ this.banner.setScale(1).setColor(oldColor || '#fff4cc'); }
+      });
+    }
+    // BOSS phaseFx 借用做地震(100 时)
+    if(n===100 && this.cameras && this.cameras.main) this.cameras.main.shake(680, 0.018);
+  }
+  // r35: Adaptive Quality Scaler — 60-frame rolling FPS,跌过 45 持续 2s → LOW,回升过 55 持续 3s → NORMAL
+  _tickAQS(realDt){
+    if(!this._fpsHistory) return;
+    const fps = this.game && this.game.loop ? this.game.loop.actualFps : 60;
+    this._fpsHistory.push(fps); if(this._fpsHistory.length>60) this._fpsHistory.shift();
+    if(this._fpsHistory.length < 20) return;                                  // 启动头 ~0.33s 不评
+    const avg = this._fpsHistory.reduce((a,b)=>a+b,0) / this._fpsHistory.length;
+    if(this._qualityMode === 'normal'){
+      if(avg < 45){ this._aqsLowSinceT += realDt; if(this._aqsLowSinceT >= 2.0) this._aqsSetMode('low'); }
+      else this._aqsLowSinceT = 0;
+    } else { // low
+      if(avg > 55){ this._aqsNormalSinceT += realDt; if(this._aqsNormalSinceT >= 3.0) this._aqsSetMode('normal'); }
+      else this._aqsNormalSinceT = 0;
+    }
+  }
+  // r36: Lifecycle safety net — visibilitychange 自动暂停 + 静音,回来恢复;blur/focus 补盾
+  _setupLifecycle(){
+    if(this._lifecycleSetup) return;
+    this._lifecycleSetup = true;
+    const onHide = () => {
+      if(this._lifecyclePaused) return;
+      this._lifecyclePaused = true;
+      // 记录所有 BGM 当前 volume + paused 状态
+      this._lcBgmState = ['battleBgm','titleBgm','bossBgm','victoryBgm'].map(id => {
+        const el = document.getElementById(id);
+        if(!el) return null;
+        const s = { id, vol: el.volume, wasPaused: el.paused };
+        if(!el.paused) el.pause();
+        return s;
+      }).filter(Boolean);
+      // SFX bus mute(不改 user 偏好)— 用 _masterGain 直接置 0
+      try{ AudioFX._applyVol && AudioFX._applyVol(); }catch(e){}
+      // Phaser scene pause(整 update 循环 + tweens + delayedCalls 暂停)
+      try{ if(this.scene && !this.scene.isPaused()) this.scene.pause(); }catch(e){}
+    };
+    const onShow = () => {
+      if(!this._lifecyclePaused) return;
+      this._lifecyclePaused = false;
+      // 恢复 BGM(只 resume 之前在 play 的)
+      (this._lcBgmState || []).forEach(s => {
+        const el = document.getElementById(s.id);
+        if(el && !s.wasPaused){ el.volume = s.vol; el.play().catch(()=>{}); }
+      });
+      this._lcBgmState = null;
+      // Phaser scene resume
+      try{ if(this.scene && this.scene.isPaused()) this.scene.resume(); }catch(e){}
+    };
+    this._lcOnHide = () => { if(document.hidden) onHide(); else onShow(); };
+    this._lcOnBlur = onHide; this._lcOnFocus = onShow;
+    document.addEventListener('visibilitychange', this._lcOnHide);
+    window.addEventListener('blur', this._lcOnBlur);
+    window.addEventListener('focus', this._lcOnFocus);
+    // shutdown 清 listener(scene destroy 时,virtually 无,但保险)
+    this.events && this.events.once && this.events.once('shutdown', () => {
+      document.removeEventListener('visibilitychange', this._lcOnHide);
+      window.removeEventListener('blur', this._lcOnBlur);
+      window.removeEventListener('focus', this._lcOnFocus);
+    });
+  }
+  // r42: Wave countdown ring tick — betweenWave 期间右上 ring 显倒计时,<2s 闪红+tick sfx
+  _tickWaveRing(){
+    if(!this.waveRing) return;
+    const MAX_SHOW = 5;                                              // 仅 ≤5s 时显(防 chapter 99s 干扰)
+    if(!this.betweenWave || this.waveTimer >= 99 || this.waveTimer <= 0 || this.state!=='play' && this.state!=='pause'){
+      if(this.waveRingTxt && this.waveRingTxt.text){ this.waveRing.clear(); this.waveRingTxt.setText(''); }
+      return;
+    }
+    const t = Math.min(this.waveTimer, MAX_SHOW);
+    const p = t / MAX_SHOW;                                          // progress 1→0
+    const cx = DW-50, cy = 84, r = 18;                                // r43-fix: cy 38→84 避血条覆盖
+    this.waveRing.clear();
+    // 底环 dim
+    this.waveRing.lineStyle(3, 0x3a3a30, 0.6);
+    this.waveRing.strokeCircle(cx, cy, r);
+    // 进度弧(从 12 点顺时针)
+    const critical = t < 2;
+    const flash = critical ? (0.5 + 0.5*Math.sin(this.time.now/80)) : 1;
+    const color = critical ? 0xff3a2a : 0xd8b15a;
+    this.waveRing.lineStyle(3, color, 0.95 * flash);
+    this.waveRing.beginPath();
+    this.waveRing.arc(cx, cy, r, -Math.PI/2, -Math.PI/2 + Math.PI*2*p, false);
+    this.waveRing.strokePath();
+    // 数字 1.0 取整 0.0
+    this.waveRingTxt.setText(t.toFixed(t<3?1:0)).setColor(critical?'#ff7a52':'#d8b15a');
+    // critical tick sfx 节流(每 ~500ms 一次)
+    if(critical && this.time.now - (this._lastWaveTickT||0) > 480){
+      this._lastWaveTickT = this.time.now;
+      AudioFX.telegraphDit && AudioFX.telegraphDit();
+    }
+  }
+  // r42: Combo heat trail tick — combo ≥ 15 时持续 emit,frequency/tint 跟 combo
+  _tickHeatTrail(){
+    if(!this.heatTrail) return;
+    const c = this.combo || 0;
+    if(c < 15 || this.state !== 'play'){
+      if(this.heatTrail.emitting) this.heatTrail.stop();
+      return;
+    }
+    // frequency 跟 combo:c=15 → 110ms,c=50 → 55ms,c=100 → 35ms(直接 mutate prop,setFrequency 在 Phaser 3.80 私有写不反映 prop)
+    const freq = Math.max(30, 110 - (c-15)*1.2);
+    this.heatTrail.frequency = freq;
+    if(!this.heatTrail.emitting){ this.heatTrail.start(); this.heatTrail.frequency = freq; }
+    // 跟 muzzle 位置
+    this.heatTrail.setPosition(this.muzzleX || DW/2, this.muzzleY || DH*0.6);
+  }
+  _aqsSetMode(mode){
+    if(mode === this._qualityMode) return;
+    this._qualityMode = mode;
+    this._aqsLowSinceT = 0; this._aqsNormalSinceT = 0;
+    const low = mode === 'low';
+    // 关非核心 vignette 层(critVig 由 syncHUD 控制,LOW 时强制压制;phaseVig 由 BOSS phase 控)
+    if(this.critVig) this.critVig.setVisible(!low ? true : false);
+    if(this.phaseVig) this.phaseVig.setAlpha(low ? 0 : this.phaseVig.alpha);
+    // 粒子 frequency 翻倍 = 发射间隔翻倍 = emit 减半(NORMAL 还原)
+    const mul = low ? 2.0 : 1.0;
+    [['seaSplash', 140], ['tideFog', 200]].forEach(([k, base])=>{
+      const p = this[k]; if(p && p.setFrequency) p.setFrequency(base * mul);
+    });
+    // banner 提示
+    if(this.aqsBanner) this.aqsBanner.setText(low ? '▼ LOW QUALITY · 帧率保护' : '');
   }
   wavesForLevel(L){ return [0,1,1,2,2,2,2,2,2,3,3][L]||2; }      // 总20波 · 5分钟通关节奏
   showBanner(txt){ this.banner.setText(txt).setAlpha(0);
@@ -1016,10 +1489,13 @@ class Battle extends Phaser.Scene {
     }
   }
   levelComplete(){ this.state='cutscene'; AudioFX.wave(); AudioFX.levelStinger && AudioFX.levelStinger();
+    if(this.level===1) this._unlockAch && this._unlockAch('survivor');                       // r44
     // r25: 记本章战绩(time/kills/score)
     const t=Math.max(0.5,((this.time.now-(this.levelStartTime||0))/1000));
     this.chapterStats=this.chapterStats||[];
-    this.chapterStats.push({lv:this.level, time:t, kills:this.kills-(this.levelStartKills||0), score:this.score-(this.levelStartScore||0)});
+    const lvKills = this.kills-(this.levelStartKills||0), lvScore = this.score-(this.levelStartScore||0);
+    const rank = this._calcChapterRank(this.level, t, lvKills, lvScore, this.bunkerHP/this.maxHP);   // r39
+    this.chapterStats.push({lv:this.level, time:t, kills:lvKills, score:lvScore, rank});
     const bonus=this.level*250; this.score+=bonus;                                  // 奖励:分数
     WEAPONS.forEach(w=>this.wAmmo[w.id]=w.clip); this.ammo=this.weapon().clip; this.reloading=false;  // 弹药全补
     this.bunkerHP=clamp(this.bunkerHP+30,0,this.maxHP);                              // 碉堡修复
@@ -1027,6 +1503,7 @@ class Battle extends Phaser.Scene {
     this.showCutscene(false,bonus);
     this.time.delayedCall(4000,()=>{                                                // 4s 过场(5分钟通关)
       this.hideCutscene(); this.level++; this.waveInLevel=0; this.betweenWave=true; this.waveTimer=99; this.state='chapter';
+      this._saveProgress && this._saveProgress();                                    // r38: level++ 后存档(下一关起点 + 含 bonus 的 score)
       const b2=document.getElementById('battleBgm'); b2&&b2.play().catch(()=>{});    // BGM 切换不阻塞
       // 章节预告卡 1.6s → r28 Pick B 引言板 3.2s/1.8s → play
       this.showChapterCard();
@@ -1044,18 +1521,75 @@ class Battle extends Phaser.Scene {
     // r25: 收 L10 战绩 + 总耗时
     const t=Math.max(0.5,((this.time.now-(this.levelStartTime||0))/1000));
     this.chapterStats=this.chapterStats||[];
-    this.chapterStats.push({lv:this.level, time:t, kills:this.kills-(this.levelStartKills||0), score:this.score-(this.levelStartScore||0)});
+    const lvKills = this.kills-(this.levelStartKills||0), lvScore = this.score-(this.levelStartScore||0);
+    const rank = this._calcChapterRank(this.level, t, lvKills, lvScore, this.bunkerHP/this.maxHP);
+    this.chapterStats.push({lv:this.level, time:t, kills:lvKills, score:lvScore, rank});
     if(this.score>this.best){ this.best=this.score; localStorage.setItem('nbs2_best',this.best); }
+    this._saveTopAttempt && this._saveTopAttempt('cycle 9 holds');                   // r38: 通关 top5 排行
+    this._clearProgress && this._clearProgress();                                    // r38: 通关清存档(下次玩从头)
+    this._unlockAch && this._unlockAch('cycle_holds');                               // r44: 通关成就
+    // r43: 通关授 Cycle Credits(按整局最末关 rank · S=4/A=3/B=2/C=1)
+    const last = (this.chapterStats||[])[this.chapterStats?.length-1];
+    const award = {S:4, A:3, B:2, C:1}[last?.rank?.letter || 'C'] || 1;
+    try{ const cur = +(localStorage.getItem('bt_credits')||0); localStorage.setItem('bt_credits', cur + award); this._lastCreditsAwarded = award; }catch(e){}
     const bb=document.getElementById('battleBgm'); bb&&bb.pause(); AudioFX.stopBGM();
     const vm=document.getElementById('victoryBgm'); if(vm){ vm.volume=0.62; vm.currentTime=0; vm.play().catch(()=>{}); }
     this.showCutscene(true,0);
     this.time.delayedCall(2200,()=>this.showEisenLine(EISEN_LINES.finalVictory));
   }
+  // r40: Eisen 中场战术电报 — 按战况触发节流(每关最多 2 句,12s 间隔)
+  _maybeMidbattleLine(key){
+    if(this.state!=='play') return;
+    if(!EISEN_LINES.midbattle || !EISEN_LINES.midbattle[key]) return;
+    const now = this.time.now;
+    this._midLineCount = this._midLineCount || 0;
+    this._midLineLastT = this._midLineLastT || 0;
+    this._midLineSeen = this._midLineSeen || {};
+    if(this._midLineSeen[this.level+':'+key]) return;                  // 每关每 key 只触发 1 次
+    if(this._midLineCount >= 2) return;                                 // 每关最多 2 句
+    if(now - this._midLineLastT < 12000) return;                        // 12s 间隔
+    const pool = EISEN_LINES.midbattle[key];
+    const line = pool[Math.floor(Math.random()*pool.length)];
+    this.showEisenLine(line);
+    this._midLineCount++; this._midLineLastT = now;
+    this._midLineSeen[this.level+':'+key] = true;
+  }
+  // 关换时复位 mid line 计数(在 startWave 内调)
+  _resetMidLineCount(){ this._midLineCount = 0; this._midLineSeen = {}; }
+  // r39: 章节关卡 S/A/B/C 评级 — 综合 hp% / time / score / kills 4 维 4-分制
+  _calcChapterRank(level, time, kills, score, hpFrac){
+    // 各维 0-1 normalize
+    const hpScore = clamp(hpFrac, 0, 1);                                                       // bunker 越满分越高
+    const expectedTime = level<=3 ? 18 : level<=7 ? 24 : level<=9 ? 30 : 50;                  // 关卡预期时长(s)
+    const timeScore = clamp(1 - Math.max(0, time - expectedTime) / expectedTime, 0, 1);       // 超时减分
+    const expectedScore = level * 1200;
+    const scoreScore = clamp(score / expectedScore, 0, 1.5);                                  // 超量爆分允许 >1
+    const expectedKills = level * 7;
+    const killsScore = clamp(kills / expectedKills, 0, 1.5);
+    // 加权:hp 30% / time 25% / score 25% / kills 20%
+    const total = hpScore*0.30 + timeScore*0.25 + scoreScore*0.25 + killsScore*0.20;
+    // 4-分制 mapping
+    if(total >= 1.05) return { letter:'S',  color:'#ffd24a', total };
+    if(total >= 0.85) return { letter:'A',  color:'#d8b15a', total };
+    if(total >= 0.65) return { letter:'B',  color:'#c8c8b8', total };
+    return                     { letter:'C',  color:'#9aa3a0', total };
+  }
   showCutscene(isFinal,bonus){ const ov=document.getElementById('cutscene'), vid=document.getElementById('cutsceneVid');
     document.getElementById('title').classList.add('hidden'); document.getElementById('over').classList.add('hidden');  // 防遮罩叠加
-    const rank=this.kills>=180?'S':this.kills>=120?'A':this.kills>=70?'B':'C';
+    // r39: 取本章 rank(从 chapterStats 最后一条)— isFinal 整局聚合,非 final 单章
+    const lastStat = (this.chapterStats||[])[this.chapterStats?.length-1];
+    const chapterRank = lastStat?.rank || { letter: this.kills>=180?'S':this.kills>=120?'A':this.kills>=70?'B':'C', color:'#d8b15a' };
+    const rank = chapterRank.letter;
     document.getElementById('cutTitle').innerHTML = isFinal? 'The Cape · <span class="accent">SECURED</span>' : ('Sector '+this.level+' · Line Held');
     document.getElementById('cutSubLabel').textContent = isFinal? 'VICTORY · THE LAST CAPE STANDS' : ('SECTOR '+this.level+' SECURED');
+    // r39: RANK 大字单独显在 cutTitle 上方(Back.easeOut 弹入)
+    const rankEl = document.getElementById('cutRank');
+    if(rankEl){
+      rankEl.textContent = '◆ RANK ' + rank + ' ◆';
+      rankEl.style.color = chapterRank.color;
+      rankEl.style.opacity = '0'; rankEl.style.transform = 'scale(0.4)';
+      requestAnimationFrame(()=>{ rankEl.style.transition='opacity .5s ease, transform .5s cubic-bezier(.34,1.56,.64,1)'; rankEl.style.opacity='1'; rankEl.style.transform='scale(1)'; });
+    }
     // r25: 终局战绩柱图(每章耗时归一化到最长章)
     let statsHtml='';
     if(isFinal && this.chapterStats && this.chapterStats.length){
@@ -1089,13 +1623,110 @@ class Battle extends Phaser.Scene {
   }
   hideCutscene(){ const ov=document.getElementById('cutscene'), vid=document.getElementById('cutsceneVid'); ov.classList.add('hidden'); if(vid)vid.pause(); }
 
+  // r32: Cycle 9 Codex first-encounter dossier — slide-in 右上角 1.8s 自动消失,不打断战斗
+  // r44: Achievement 系统 — localStorage 持久化已解锁 set,_unlockAch 触发右上角 banner
+  _achSeen(){ try{ return new Set(JSON.parse(localStorage.getItem('bt_ach')||'[]')); }catch(e){ return new Set(); } }
+  _unlockAch(id){
+    const seen = this._achSeen(); if(seen.has(id)) return;
+    const ach = ACHIEVEMENTS.find(a => a.id === id); if(!ach) return;
+    seen.add(id); try{ localStorage.setItem('bt_ach', JSON.stringify(Array.from(seen))); }catch(e){}
+    // 右上 banner slide-in 2.4s
+    const card = document.getElementById('achievementCard'); if(!card) return;
+    document.getElementById('achievementIcon').textContent = ach.icon;
+    document.getElementById('achievementName').textContent = ach.name;
+    document.getElementById('achievementDesc').textContent = ach.desc;
+    card.style.right = '16px'; card.style.opacity = '1';
+    AudioFX.levelStinger && AudioFX.levelStinger();
+    this.time.delayedCall(2400, ()=>{
+      card.style.right = '-420px'; card.style.opacity = '0';
+    });
+  }
+  // 全局 check — 调用点散落但 method 集中
+  _checkAch(){
+    if(this.kills >= 1) this._unlockAch('first_blood');
+    if(this.combo >= 100) this._unlockAch('legend_combo');
+    // bestiary: 9 codex 全见
+    if(this._codexSeen && this._codexSeen().size >= 9) this._unlockAch('bestiary');
+    // arsenal master: bt_upgrades 全 4 武器 LV3
+    try{ const up = JSON.parse(localStorage.getItem('bt_upgrades')||'{}');
+      if(['mg','shotgun','rifle','flamer'].every(k => (up[k]||0) >= 3)) this._unlockAch('arsenal_master');
+    }catch(e){}
+  }
+  // r38: 进度存档 — levelComplete 调存,title screen 检查后显 RESUME 按钮,finalVictory/over 通关清存档
+  _saveProgress(){
+    try{ localStorage.setItem('bt_progress', JSON.stringify({ lv:this.level, sc:this.score, kl:this.kills, bt:this.best, ts:Date.now() })); }catch(e){}
+  }
+  _loadProgress(){
+    try{ const s = JSON.parse(localStorage.getItem('bt_progress')||'null'); return (s && s.lv>=1 && s.lv<=10) ? s : null; }catch(e){ return null; }
+  }
+  _clearProgress(){ try{ localStorage.removeItem('bt_progress'); }catch(e){} }
+  // r38: TOP 5 attempts 排行(over/finalVictory 时 push,按 score 降序 slice 5)
+  _saveTopAttempt(reason){
+    try{
+      const list = JSON.parse(localStorage.getItem('bt_top5')||'[]');
+      list.push({ s:this.score, l:this.level, k:this.kills, r:reason||'overrun', d:new Date().toISOString().slice(0,10) });
+      list.sort((a,b)=>b.s-a.s);
+      localStorage.setItem('bt_top5', JSON.stringify(list.slice(0,5)));
+    }catch(e){}
+  }
+  _loadTop5(){ try{ return JSON.parse(localStorage.getItem('bt_top5')||'[]'); }catch(e){ return []; } }
+  // localStorage 持久化已见集合(玩家重玩不再被打扰)
+  _codexSeen(){
+    try{ return new Set(JSON.parse(localStorage.getItem('bt_codex_seen')||'[]')); }catch(e){ return new Set(); }
+  }
+  _codexMarkSeen(t){
+    try{ const s=this._codexSeen(); s.add(t); localStorage.setItem('bt_codex_seen', JSON.stringify(Array.from(s))); }catch(e){}
+  }
+  showCodex(type){
+    if(!CODEX[type] || this._codexQueue && this._codexQueue.length>3) return;
+    if(this._codexSeen().has(type)) return;
+    this._codexMarkSeen(type);
+    // r44 Pick B: codex first-encounter +50 bonus score chunks(复用 r41 chunks 系统)
+    if(this._spawnScoreChunks && this.state==='play'){
+      const z = (this.zombies||[]).find(z => !z.dead && z.type===type);
+      const sx = z?.spr?.x ?? DW/2, sy = z?.spr?.getBounds?.()?.centerY ?? DH*0.5;
+      this._spawnScoreChunks(sx, sy, 50);
+    }
+    // r44: bestiary 9 全集 check(必须 mark seen 之后看 size)
+    if(this._codexSeen && this._codexSeen().size >= 9) this._unlockAch && this._unlockAch('bestiary');
+    this._codexQueue = this._codexQueue || [];
+    this._codexQueue.push(type);
+    if(!this._codexShowing) this._codexFlush();
+  }
+  _codexFlush(){
+    if(!this._codexQueue || !this._codexQueue.length){ this._codexShowing=false; return; }
+    this._codexShowing = true;
+    const type = this._codexQueue.shift();
+    const c = CODEX[type]; const card=document.getElementById('codexCard');
+    if(!c || !card){ this._codexFlush(); return; }
+    document.getElementById('codexImg').src = 'assets/codex/codex_'+type+'.png';
+    document.getElementById('codexName').textContent = c.name;
+    document.getElementById('codexThreat').textContent = c.threat;
+    document.getElementById('codexLore').textContent = c.lore;
+    // slide-in from right + fade
+    card.style.right = '16px'; card.style.opacity = '1';
+    AudioFX.telegraphDit && AudioFX.telegraphDit();
+    this.time.delayedCall(1800, ()=>{
+      card.style.right = '-380px'; card.style.opacity = '0';
+      this.time.delayedCall(450, ()=>this._codexFlush());
+    });
+  }
+
   spawn(type, opts){
     const cfg=TYPES[type];
     const x = (opts && opts.x!=null) ? opts.x : rnd(DW*0.16,DW*0.84);
     // r25: 出水预告 — 杂兵 spawn 前 0.36s 海面冒涟漪+黑潮汽气(BOSS/已预告/强制位置时跳过)
     if(!cfg.boss && !(opts && opts.skipTell)){
-      this.spawnTell(x); this.time.delayedCall(360, ()=>this.spawn(type, {x, skipTell:true})); return;
+      this.spawnTell(x); this.time.delayedCall(360, ()=>this.spawn(type, {x, skipTell:true}));
+      // r32: first-encounter codex 触发(只 1 次 / type · localStorage 持久化)
+      this.showCodex && this.showCodex(type);
+      // r40: 中场战术线索 — 关键敌种出现时触发 Eisen 战术 line
+      if(type==='brute') this._maybeMidbattleLine && this._maybeMidbattleLine('bruteHeavy');
+      else if(type==='spitter') this._maybeMidbattleLine && this._maybeMidbattleLine('spitterSeen');
+      return;
     }
+    // r41: BOSS spawn 也触发 codex first-encounter(原 r32 hook 在杂兵路径,BOSS 走 skipTell 绕过了)
+    if(cfg.boss) this.showCodex && this.showCodex(type);
     let spr, animated=false;
     // r28: Leviathan 用 sprite sheet 8 帧动画(替代静态 image)
     if(type==='leviathan' && this.textures.exists('z_boss_leviathan_anim')){
@@ -1182,11 +1813,47 @@ class Battle extends Phaser.Scene {
     z.shadow=this.add.ellipse(x, HORIZON_Y, 40, 12, 0x000000, 0.30).setDepth(9); }
 
   /* ---------- 武器系统 ---------- */
-  weapon(){ return WEAPONS[this.weaponIdx]; }
+  // r43: weapon() 按 Armory upgrades patch dmg/clip/fireRate/pellets;cache 防 hot path 抖动
+  _loadUpgrades(){ try{ return JSON.parse(localStorage.getItem('bt_upgrades')||'{}'); }catch(e){ return {}; } }
+  _rebuildWeaponCache(){
+    const up = this._loadUpgrades();
+    this._patchedWeapons = WEAPONS.map(w => {
+      const lv = up[w.id] || 0;
+      const patched = {...w};
+      if(lv > 0){
+        if(w.id==='mg'){      patched.dmg = w.dmg * (1+lv*0.15); patched.clip = w.clip + lv*20; }
+        else if(w.id==='shotgun'){ patched.dmg = w.dmg * (1+lv*0.15); patched.pellets = w.pellets + lv; }
+        else if(w.id==='rifle'){   patched.dmg = w.dmg * (1+lv*0.20); patched.fireRate = Math.max(300, w.fireRate - lv*60); }
+        else if(w.id==='flamer'){  patched.dmg = w.dmg * (1+lv*0.12); patched.clip = w.clip + lv*40; }
+        patched._lv = lv;
+      }
+      return patched;
+    });
+  }
+  weapon(){ if(!this._patchedWeapons) this._rebuildWeaponCache(); return this._patchedWeapons[this.weaponIdx]; }
   syncWeapon(){ const w=this.weapon(); this.clip=w.clip; this.fireRate=w.fireRate; this.reloadDur=w.reloadDur;
     this.ammo=(this.wAmmo[w.id]!==undefined?this.wAmmo[w.id]:w.clip);
-    if(this.gun){ const tx=this.textures.exists(w.tex)?w.tex:'gun_fp'; this.gun.setTexture(tx); this.gun.setScale((DW*w.scaleW)/this.gun.width);
-      this.barrelLen=this.gun.displayHeight*0.9; }
+    if(this.gun){
+      const tx=this.textures.exists(w.tex)?w.tex:'gun_fp';
+      // r45: 武器切换动画 — 旧枪下沉 fade 110ms + 新枪从下方 Back.easeOut 180ms 弹入
+      const baseY = this.gun.y;
+      const wasSwap = this._lastWeaponTex && this._lastWeaponTex !== tx;
+      if(wasSwap){
+        this.tweens.killTweensOf(this.gun);
+        this.tweens.add({ targets:this.gun, y: baseY + 80, alpha: 0.0, duration: 110, ease:'Quad.easeIn',
+          onComplete: ()=>{
+            this.gun.setTexture(tx); this.gun.setScale((DW*w.scaleW)/this.gun.width);
+            this.barrelLen = this.gun.displayHeight*0.9;
+            this.gun.y = baseY + 60;
+            this.tweens.add({ targets:this.gun, y: baseY, alpha: 1.0, duration: 220, ease:'Back.easeOut' });
+          }
+        });
+      } else {
+        this.gun.setTexture(tx); this.gun.setScale((DW*w.scaleW)/this.gun.width);
+        this.barrelLen = this.gun.displayHeight*0.9;
+      }
+      this._lastWeaponTex = tx;
+    }
     if(this.hudWeapon)this.hudWeapon.setText(w.name);
     // r24: 武器图标条高亮当前
     if(this.hudWBoxes){
@@ -1209,7 +1876,40 @@ class Battle extends Phaser.Scene {
     if(!this.sceneFade)this.sceneFade=this.add.rectangle(DW/2,DH/2,DW,DH,0x05080a).setAlpha(0).setDepth(73);
     const sc=SCENES[target]; this.sceneIdx=target;
     this.tweens.add({targets:this.sceneFade,alpha:1,duration:380,yoyo:true,hold:220,
-      onYoyo:()=>{ const b=this.bgImg; b.setTexture(sc.key); const s=Math.max(DW/b.width,DH/b.height); b.setScale(s); b.setTint(sc.tint); }});
+      onYoyo:()=>{ const b=this.bgImg; b.setTexture(sc.key); const s=Math.max(DW/b.width,DH/b.height); b.setScale(s); b.setTint(sc.tint);
+        AudioFX.setSceneAcoustic && AudioFX.setSceneAcoustic(target);          // r32: 场景声学跟切
+        this._setSceneLut && this._setSceneLut(target);                        // r39: 场景特化 LUT 调色跟切
+        this._showSceneNameCard && this._showSceneNameCard(sc.name);           // r45: 场景大字 cinematic
+      }});
+  }
+  // r45: 场景大字 cinematic banner — fade-in 360ms hold 1000ms fade-out 540ms
+  _showSceneNameCard(name){
+    if(!this.sceneNameCard){
+      this.sceneNameCard = this.add.container(DW/2, DH*0.42).setDepth(95);
+      const label = this.add.text(0, -22, '▼ NOW ENTERING', {fontFamily:'"Oswald",sans-serif',fontSize:'13px',color:'#d8b15a',fontStyle:'600'}).setOrigin(0.5);
+      label.setLetterSpacing && label.setLetterSpacing(8);
+      const title = this.add.text(0, 6, '', {fontFamily:'"Black Ops One",cursive',fontSize:'34px',color:'#fff4cc',stroke:'#1a0d0c',strokeThickness:3}).setOrigin(0.5);
+      title.setLetterSpacing && title.setLetterSpacing(4);
+      this.sceneNameCard.add([label, title]);
+      this.sceneNameCard._title = title;
+    }
+    this.tweens.killTweensOf(this.sceneNameCard);
+    this.sceneNameCard._title.setText(name.toUpperCase());
+    this.sceneNameCard.setAlpha(0).setScale(0.85);
+    this.tweens.add({targets:this.sceneNameCard, alpha:1, scale:1.0, duration:360, ease:'Back.easeOut'});
+    if(this._sceneCardHideEv) this._sceneCardHideEv.remove(false);                       // 防重叠 delayedCall
+    this._sceneCardHideEv = this.time.delayedCall(1720, ()=>{
+      this.tweens.add({targets:this.sceneNameCard, alpha:0, duration:540, ease:'Sine.easeIn'});
+    });
+  }
+  // r39: 场景特化 LUT overlay — MULTIPLY 染色,切场景 tween 470ms 渐变
+  _setSceneLut(idx){
+    if(!this.sceneLut) return;
+    const sc = SCENES[idx] || SCENES[0];
+    this.tweens.killTweensOf(this.sceneLut);
+    // setFillStyle 瞬切色,alpha tween 渐变(避免 fillColor tween 闪烁)
+    this.sceneLut.setFillStyle(sc.lutColor, this.sceneLut.alpha);
+    this.tweens.add({ targets:this.sceneLut, alpha:sc.lutAlpha, duration:470, ease:'Sine.easeInOut' });
   }
   showChapterCard(){
     const ch=CHAPTERS[this.level]; if(!ch)return;
@@ -1281,7 +1981,10 @@ class Battle extends Phaser.Scene {
     if(n===this.sceneIdx)return; const sc=SCENES[n]; this.sceneIdx=n;
     if(!this.sceneFade)this.sceneFade=this.add.rectangle(DW/2,DH/2,DW,DH,0x05080a).setAlpha(0).setDepth(73);
     this.tweens.add({targets:this.sceneFade,alpha:1,duration:420,yoyo:true,hold:280,
-      onYoyo:()=>{ const b=this.bgImg; b.setTexture(sc.key); const s=Math.max(DW/b.width,DH/b.height); b.setScale(s); b.setTint(sc.tint); this.showBanner('▶ '+sc.name); }}); }
+      onYoyo:()=>{ const b=this.bgImg; b.setTexture(sc.key); const s=Math.max(DW/b.width,DH/b.height); b.setScale(s); b.setTint(sc.tint); this.showBanner('▶ '+sc.name);
+        AudioFX.setSceneAcoustic && AudioFX.setSceneAcoustic(n);              // r32: 场景声学跟切
+        this._setSceneLut && this._setSceneLut(n);                            // r39: LUT 跟切
+      }}); }
 
   /* ---------- 怪物行为 ---------- */
   explode(z){ if(z._exploded)return; z._exploded=true;
@@ -1436,20 +2139,62 @@ class Battle extends Phaser.Scene {
   }
   kill(z,x,y){
     z.dead=true; this.kills++; this.combo++; this.comboT=2.4;
-    if(z.cfg.boss){                                                    // BOSS 死亡:大爆 + 冲击波 + 全屏白闪 + 切回 battle BGM + banner
-      // 冲击波环(从 BOSS 位置扩出)
-      const shock=this.add.circle(z.spr.x, z.spr.getBounds().centerY, 24).setStrokeStyle(8,0xffffff,0.95).setDepth(85);
-      this.tweens.add({targets:shock, radius:680, alpha:0, duration:900, onComplete:()=>shock.destroy()});
-      // 全屏白闪
-      if(this.flash){ this.flash.setAlpha(0.85); this.tweens.add({targets:this.flash,alpha:0,duration:520}); }
-      this.cameras.main.shake(900,0.022);
-      this.gore.emitParticleAt(z.spr.x,(z.spr.getBounds()).centerY,120);
-      this.bloods.emitParticleAt(z.spr.x,(z.spr.getBounds()).centerY,80);
-      if(this.anims.exists('fx_skull')){ const sk=this.add.sprite(z.spr.x,(z.spr.getBounds()).centerY,'fx_skull').setDepth(86).setScale(3.0).setBlendMode('ADD'); sk.play('fx_skull'); this.tweens.add({targets:sk,scale:4.5,alpha:0,duration:900,onComplete:()=>sk.destroy()}); }
-      this.showBanner('☠ BOSS DOWN · '+z.cfg.bossName+' ☠');
-      AudioFX.bossDeath(z.type);                                            // 专属塌缩死亡音
-      // r30: BOSS-defeat orchestral hit(在塌缩之后 280ms,与冲击波/全屏闪同步爽感)
-      this.time.delayedCall(280,()=>AudioFX.bossStinger && AudioFX.bossStinger());
+    if(this.kills===1) this._unlockAch && this._unlockAch('first_blood');                 // r44
+    // r37: Combo milestone bonus — 25/50/100 触发递进奖励
+    if(this.combo===25 || this.combo===50 || this.combo===100){
+      this._comboMilestone(this.combo);
+      if(this.combo===100) this._unlockAch && this._unlockAch('legend_combo');             // r44
+    }
+    if(z.cfg.boss){                                                    // r33: BOSS 死亡多 stage cinematic
+      const bx=z.spr.x, by=z.spr.getBounds().centerY;
+      const isFinal = z.type==='leviathan';                            // L10 leviathan 是终局
+      // === Stage 1 (0ms):freeze-frame 350ms + slowmo dive in ===
+      this._phaseFreeze = 0.35;                                        // gameplay 冻 350ms
+      if(this.slowmoT < 0.6) this.slowmoT = 1.0;                       // 进慢镜 1s
+      if(this.slowVig) this.slowVig.setAlpha(0.55);
+      AudioFX.diveIn && AudioFX.diveIn();
+      // BOSS sprite 大放大 + 红 tintFill 留 frame(leviathan 锁 frame 7 死前最终怒吼)
+      if(z.spr.setFrame && z.type==='leviathan') z.spr.setFrame(7);
+      z.spr.setTintFill(0xff5a3a);
+      this.tweens.add({targets:z.spr, scaleX:z._sxNow*1.35, scaleY:z._syNow*1.30, angle:rnd(-6,6), duration:340, ease:'Quad.easeOut'});
+      // === Stage 2 (350ms):冲击波 + 全屏白闪 + 屏震 ===
+      this.time.delayedCall(350,()=>{
+        const shock=this.add.circle(bx, by, 24).setStrokeStyle(10,0xffffff,0.98).setDepth(85);
+        this.tweens.add({targets:shock, radius:isFinal?900:680, alpha:0, duration:isFinal?1200:900, onComplete:()=>shock.destroy()});
+        // 二层冲击波(只 leviathan)
+        if(isFinal){
+          const shock2=this.add.circle(bx, by, 24).setStrokeStyle(6,0xff8c52,0.85).setDepth(85);
+          this.tweens.add({targets:shock2, radius:1100, alpha:0, duration:1400, delay:140, onComplete:()=>shock2.destroy()});
+        }
+        if(this.flash){ this.flash.setAlpha(isFinal?1.0:0.85); this.tweens.add({targets:this.flash,alpha:0,duration:isFinal?720:520}); }
+        this.cameras.main.shake(isFinal?1200:900, isFinal?0.028:0.022);
+        AudioFX.bossDeath(z.type);
+      });
+      // === Stage 3 (730ms):骨血爆 + skull FX + bossStinger ===
+      this.time.delayedCall(730,()=>{
+        const N = isFinal ? 200 : 120;
+        this.gore.emitParticleAt(bx, by, N);
+        this.bloods.emitParticleAt(bx, by, Math.floor(N*0.7));
+        if(this.anims.exists('fx_skull')){
+          const skullN = isFinal ? 3 : 1;
+          for(let i=0;i<skullN;i++){
+            const sk=this.add.sprite(bx+rnd(-60,60), by+rnd(-40,40), 'fx_skull').setDepth(86).setScale(isFinal?3.5:3.0).setBlendMode('ADD');
+            sk.play('fx_skull');
+            this.tweens.add({targets:sk, scale:isFinal?5.2:4.5, alpha:0, duration:isFinal?1200:900, onComplete:()=>sk.destroy()});
+          }
+        }
+        AudioFX.bossStinger && AudioFX.bossStinger();
+        this.showBanner('☠ BOSS DOWN · '+z.cfg.bossName+' ☠');
+      });
+      // === Stage 4 (only isFinal, 1800ms):final fade-to-white 衔接 final-victory cinematic ===
+      if(isFinal && this.flash){
+        this.time.delayedCall(1800,()=>{
+          this.flash.setAlpha(0);
+          this.tweens.add({targets:this.flash, alpha:1.0, duration:1200, onComplete:()=>{
+            // finalVictory 接 cutscene 自然 fade,这里只是衔接帧白屏
+          }});
+        });
+      }
       const boss=document.getElementById('bossBgm'), bb=document.getElementById('battleBgm');
       if(boss && bb) AudioFX.bgmCrossfade(boss, bb, boss.volume, 0.55, 800);
       else if(bb){ bb.currentTime=0; bb.play().catch(()=>{}); }
@@ -1458,10 +2203,15 @@ class Battle extends Phaser.Scene {
     }
     z.shadow && this.tweens.add({targets:z.shadow,alpha:0,duration:420});
     const pts=Math.round(z.cfg.score*(1+Math.floor(this.combo/5)*0.5));
-    this.score+=pts;
     AudioFX.kill(z.spr.x); const load=this.zombies.length, burst0=(z.type==='brute'?40:22)*(load>18?0.5:1); this.bloods.emitParticleAt(z.spr.x, y, burst0);
-    this.floatText(z.spr.x, z.spr.getBounds().centerY, '+'+pts, '#d8b15a');
-    if(this.combo>1&&this.combo%10===0)this.showBanner(this.combo+' KILL STREAK');
+    if(z.cfg.boss){
+      // r41: BOSS 死时 score chunks 飘字向 hudScore 飞 + 逐个累加(替原单 +pts 立加)
+      this._spawnScoreChunks && this._spawnScoreChunks(z.spr.x, z.spr.getBounds().centerY, pts);
+    } else {
+      this.score+=pts;
+      this.floatText(z.spr.x, z.spr.getBounds().centerY, '+'+pts, '#d8b15a');
+    }
+    if(this.combo>1&&this.combo%10===0 && this.combo!==25 && this.combo!==50 && this.combo!==100)this.showBanner(this.combo+' KILL STREAK');  // r37: milestone 时跳过通用 STREAK,让 _comboMilestone banner 不被覆盖
     // r26: 连击徽章里程碑弹跳 5/10/20/40
     if(this.comboBadge && (this.combo===5||this.combo===10||this.combo===20||this.combo===40)){
       this.tweens.killTweensOf(this.comboBadge);
@@ -1479,9 +2229,42 @@ class Battle extends Phaser.Scene {
   }
   floatText(x,y,t,c){ const o=this.add.text(x,y,t,{fontFamily:'"Oswald",sans-serif',fontSize:'22px',fontStyle:'600',color:c}).setOrigin(0.5).setDepth(85);
     this.tweens.add({targets:o,y:y-40,alpha:0,duration:700,onComplete:()=>o.destroy()}); }
+  // r41: Floating score chunks — BOSS 死时 pts 拆 N 块 sequentially 飘字向 hudScore 飞,每到达 +小额累加
+  _spawnScoreChunks(srcX, srcY, totalPts){
+    const N = Math.min(12, Math.max(6, Math.floor(totalPts/120)));         // 6-12 chunks 取决于总分(1200 → 10 chunks)
+    const each = Math.floor(totalPts / N);
+    const remainder = totalPts - each*N;
+    const dstX = 70, dstY = 30;                                           // hudScore 大致位置(左上 SCORE)
+    for(let i=0;i<N;i++){
+      const val = each + (i===N-1 ? remainder : 0);
+      const startX = srcX + rnd(-30, 30), startY = srcY + rnd(-20, 0);
+      // 大字金色 +val 标签(BOSS 专属醒目)
+      const o = this.add.text(startX, startY, '+'+val, { fontFamily:'"Black Ops One",cursive', fontSize:'24px', color:'#ffd24a', stroke:'#3a1a0a', strokeThickness:3 })
+        .setOrigin(0.5).setDepth(88).setScale(0.5);
+      // 分两段 tween:① 80ms 弹出放大;② 800-1400ms 抛物线飞到 hudScore + 到达回弹放大 + 累加
+      this.tweens.add({ targets:o, scale:1.0, alpha:1, duration:140, ease:'Back.easeOut' });
+      const delay = i * 80;                                                // 错开 80ms 滚动出
+      this.time.delayedCall(delay + 140, () => {
+        const arcMidY = (startY + dstY)/2 - rnd(60, 120);                  // 抛物线峰值高度
+        this.tweens.add({ targets:o, x:dstX, duration:900 + rnd(0,200), ease:'Quad.easeIn' });
+        this.tweens.add({ targets:o, y:arcMidY, duration:450, ease:'Sine.easeOut',
+          onComplete: ()=> this.tweens.add({ targets:o, y:dstY, duration:450, ease:'Quad.easeIn',
+            onComplete: ()=>{
+              // 到达 hudScore → +val 累加 + score 闪 + 销毁
+              this.score += val;
+              if(this.hudScore){ this.hudScore.setScale(1.15); this.tweens.add({targets:this.hudScore, scale:1, duration:160, ease:'Quad.easeOut'}); }
+              o.destroy();
+            }
+          })
+        });
+        this.tweens.add({ targets:o, alpha:0.85, scale:0.7, duration:900, delay:200, ease:'Cubic.easeIn' });
+      });
+    }
+  }
 
   /* ---------- 受击 / 闪电 / 补给 ---------- */
   hurtBunker(d){ this.bunkerHP=clamp(this.bunkerHP-d,0,this.maxHP); AudioFX.hurt();
+    if(this.bunkerHP/this.maxHP < 0.30) this._maybeMidbattleLine && this._maybeMidbattleLine('bunkerCrit');   // r40: 危急中场线
     this.cameras.main.shake(140,0.012); this.damageVig.setAlpha(.6);
     this.tweens.add({targets:this.damageVig,alpha:0,duration:500});
     this.dust.emitParticleAt(rnd(DW*0.3,DW*0.7),DH-120,14);
@@ -1540,6 +2323,10 @@ class Battle extends Phaser.Scene {
     if((this.boostTimer||0)>0)this.boostTimer-=realDt;              // damage boost 倒计时
     if(this.slowmoT>0){ this.slowmoT-=realDt; if(this.slowmoT<=0){ if(this.slowVig)this.slowVig.setAlpha(0); AudioFX.diveOut(); } }
     const dt = this.slowmoT>0? realDt*0.32 : realDt;                // 子弹时间:玩法 dt 减速
+    this._tickBossEscorts && this._tickBossEscorts(dt);             // r33: BOSS escort adaptive 补给
+    this._tickAQS && this._tickAQS(realDt);                          // r35: Adaptive Quality Scaler
+    this._tickHeatTrail && this._tickHeatTrail();                    // r42: combo heat trail emit driver
+    this._tickWaveRing && this._tickWaveRing();                      // r42: wave countdown ring
     // 准星跟随(即使没 move 事件)
     if(this.state!=='play'){ this.cross.setVisible(this.state==='pause'); return; }
     this.cross.setVisible(true);
@@ -1568,7 +2355,8 @@ class Battle extends Phaser.Scene {
     if(this._flameOnT>0){ this._flameOnT-=dt; if(this._flameOnT<=0 && this.flameSpr){ this.flameSpr.setVisible(false); this.flameSpr.anims.stop(); } }
     this.cooldown=Math.max(0,this.cooldown-dt);
     if(this.reloading){ this.reloadT-=dt; if(this.reloadT<=0){ this.reloading=false; this.ammo=this.clip; AudioFX.reloadDone(); } }
-    if(!this.reloading && this.ammo>0 && this.ammo<=Math.max(2, this.clip*0.10) && this.firing) AudioFX.lowAmmoTick();
+    if(!this.reloading && this.ammo>0 && this.ammo<=Math.max(2, this.clip*0.10) && this.firing){ AudioFX.lowAmmoTick();
+      this._maybeMidbattleLine && this._maybeMidbattleLine('ammoLow'); }   // r40: ammo<10% Eisen 中场提示
     if(this.comboT>0){ this.comboT-=dt; if(this.comboT<=0)this.combo=0; }
 
     // 波次调度
@@ -1587,18 +2375,24 @@ class Battle extends Phaser.Scene {
       if(z.cfg.boss){
         if(!z._phase2 && z.hp <= z.maxhp*0.66){
           z._phase2=true; z._spdMul=(z._spdMul||1)*1.35;
-          for(let i=0;i<2;i++){ this.spawn('runner',{skipTell:true, x:z.spr.x+rnd(-80,80)}); const rr=this.zombies[this.zombies.length-1]; if(rr){rr.emerge=0; rr.roared=true;} }
+          for(let i=0;i<2;i++){ this.spawn('runner',{skipTell:true, x:z.spr.x+rnd(-80,80)}); const rr=this.zombies[this.zombies.length-1]; if(rr){rr.emerge=0; rr.roared=true; rr._isBossEscort=true;} }
           this.cameras.main.shake(560,0.010); AudioFX.bossPhase(z.spr.x); AudioFX.bossRoar(z.type, z.spr.x);
           this._bossPhaseFx(z, 1);
           this.showBanner('PHASE 2 · '+z.cfg.bossName);
+          // r33: phase2 escort cap +2(变 6),tick 节奏加快 750ms
+          z._escortCap = 6; z._escortRespawnT = 0.5;
+          this.time.delayedCall(900, ()=>this._maybeMidbattleLine && this._maybeMidbattleLine('bossPhase2'));   // r40
         }
         if(!z._phase3 && z.hp <= z.maxhp*0.33){
           z._phase3=true; z._spdMul=(z._spdMul||1)*1.25;
-          for(let i=0;i<3;i++){ this.spawn('runner',{skipTell:true, x:z.spr.x+rnd(-120,120)}); const rr=this.zombies[this.zombies.length-1]; if(rr){rr.emerge=0; rr.roared=true;} }
+          for(let i=0;i<3;i++){ this.spawn('runner',{skipTell:true, x:z.spr.x+rnd(-120,120)}); const rr=this.zombies[this.zombies.length-1]; if(rr){rr.emerge=0; rr.roared=true; rr._isBossEscort=true;} }
           this.cameras.main.shake(820,0.014); AudioFX.bossPhase(z.spr.x); AudioFX.bossRoar(z.type, z.spr.x);
           this._bossPhaseFx(z, 2);
           this.showBanner('☠ FINAL PHASE ☠');
           if(this.edgePulse){ this.edgePulse.setAlpha(0); this.tweens.add({targets:this.edgePulse,alpha:0.6,duration:300,yoyo:true,hold:300,repeat:3,onComplete:()=>this.edgePulse.setAlpha(0)}); }
+          // r33: phase3 escort cap +4(变 8 个),tick 0.5s 更急
+          z._escortCap = 8; z._escortRespawnT = 0.3;
+          this.time.delayedCall(1100, ()=>this._maybeMidbattleLine && this._maybeMidbattleLine('bossPhase3'));   // r40
         }
       }
       const cap=(z.cfg.behavior==='ranged')?(z.cfg.stopAt||0.6):1;   // 投掷兵中距停下
@@ -1665,7 +2459,19 @@ class Battle extends Phaser.Scene {
     s.setData('life',0); }
 
   syncHUD(){
-    this.hudScore.setText(String(this.score).padStart(5,'0'));
+    // r37: score 滚动数字动效 — 用 tween 桥接 displayedScore→score,250ms 滚动期 setColor 金色闪现
+    if(this._displayedScore == null) this._displayedScore = this.score;
+    if(this._displayedScore !== this.score){
+      const obj = { v: this._displayedScore };
+      this.tweens.killTweensOf(obj);
+      this.hudScore.setColor('#d8b15a');                                 // 金色闪现
+      this.tweens.add({ targets:obj, v:this.score, duration:250, ease:'Cubic.easeOut',
+        onUpdate: ()=> this.hudScore.setText(String(Math.round(obj.v)).padStart(5,'0')),
+        onComplete: ()=>{ this._displayedScore = this.score; this.hudScore.setText(String(this.score).padStart(5,'0')); this.hudScore.setColor('#e7e6df'); }
+      });
+    } else {
+      this.hudScore.setText(String(this.score).padStart(5,'0'));
+    }
     this.hudWave.setText('SECTOR '+this.level+' · WAVE '+this.waveInLevel+'/'+this.wavesForLevel(this.level));
     this.hudCombo.setText(this.combo>1?('STREAK ×'+this.combo):'');
     // r26: 连击徽章 + 衰减进度环 + 颜色升级
@@ -1756,7 +2562,36 @@ class Battle extends Phaser.Scene {
     }
   }
 
-  gameOver(){ if(this.state==='over')return; this.state='over'; AudioFX.over(); AudioFX.stopBGM(); this.firing=false;
+  gameOver(){ if(this.state==='over'||this.state==='death-cam')return;
+    // r36: Death cam — 死亡触发 1.5s 慢镜 zoom 到最后近 zombie,再显 over screen
+    this.state='death-cam'; this.firing=false; AudioFX.stopSceneAmbience && AudioFX.stopSceneAmbience();
+    // 找最近 / 最逼近的 zombie 作 "last attacker"
+    let target = null, bestP = -1;
+    for(const z of this.zombies){ if(z.dead)continue; if(z.p>bestP){ bestP=z.p; target=z; } }
+    // 慢镜 + 暗角 + low-pass dive
+    this.slowmoT = 1.6; if(this.slowVig)this.slowVig.setAlpha(0.78);
+    AudioFX.diveIn && AudioFX.diveIn();
+    // BGM duck 极轻
+    const bb1=document.getElementById('battleBgm'); if(bb1){ bb1.volume = Math.max(0.05, bb1.volume*0.18); }
+    // camera zoom in to target(若有)
+    if(target && target.spr && this.cameras && this.cameras.main){
+      const cam = this.cameras.main;
+      cam.pan(target.spr.x, target.spr.getBounds().centerY, 1100, 'Cubic.easeOut');
+      cam.zoomTo(1.8, 1100, 'Cubic.easeOut');
+      // target 红光 highlight
+      target.spr.setTintFill && target.spr.setTintFill(0xff4a2a);
+    }
+    this.cameras.main.shake(420, 0.014);
+    // 中央 cinematic banner
+    if(this.banner){ this.banner.setText('☠ THE TIDE TAKES YOU ☠').setAlpha(0); this.tweens.add({targets:this.banner, alpha:1, duration:300, yoyo:false}); }
+    // 1.5s 后正式 over screen
+    this.time.delayedCall(1500, ()=>this._finalizeGameOver());
+  }
+  _finalizeGameOver(){
+    this.state='over'; AudioFX.over(); AudioFX.stopBGM();
+    // 还原 camera
+    if(this.cameras && this.cameras.main){ this.cameras.main.zoomTo(1.0, 280); this.cameras.main.pan(DW/2, DH/2, 280); }
+    if(this.slowVig)this.slowVig.setAlpha(0);
     const bb=document.getElementById('battleBgm'); bb&&bb.pause();
     const tb=document.getElementById('titleBgm'); if(tb){ tb.volume=0.4; tb.currentTime=0; tb.play().catch(()=>{}); }
     if(this.score>this.best){ this.best=this.score; localStorage.setItem('nbs2_best',this.best); }
@@ -1765,7 +2600,25 @@ class Battle extends Phaser.Scene {
     document.getElementById('overScore').textContent=this.score;
     document.getElementById('overBest').textContent = this.score>=this.best?'★ NEW RECORD':('BEST '+this.best);
     const ol=document.getElementById('overLevel'); if(ol)ol.textContent=Math.max(1,this.level||1);
+    // r38: top5 排行 + 渲染到 over screen
+    this._saveTopAttempt && this._saveTopAttempt('overrun');
+    // r43: overrun 也给少量 credits(level/3 取整,鼓励尝试)
+    try{ const cur = +(localStorage.getItem('bt_credits')||0); const award = Math.max(1, Math.floor(this.level/3)); localStorage.setItem('bt_credits', cur + award); this._lastCreditsAwarded = award; }catch(e){}
+    this._renderTop5 && this._renderTop5();
     document.getElementById('over').classList.remove('hidden');
+    if(this.banner) this.banner.setAlpha(0);
+  }
+  _renderTop5(){
+    const list = this._loadTop5 ? this._loadTop5() : [];
+    const host = document.getElementById('overTop5'); if(!host) return;
+    if(!list.length){ host.innerHTML = ''; return; }
+    const myScore = this.score;
+    host.innerHTML = '<div style="font-family:\'Oswald\',sans-serif;font-size:11px;letter-spacing:4px;color:#d8b15a;text-transform:uppercase;margin-bottom:8px">★ Top 5 Attempts ★</div>' +
+      '<ol style="margin:0;padding:0 0 0 22px;font-family:\'Courier New\',monospace;font-size:13px;color:#c8c8b8;line-height:1.7;text-align:left;list-style:decimal-leading-zero">' +
+      list.map(a => '<li' + (a.s===myScore ? ' style="color:#fff4cc;font-weight:700"' : '') + '>' +
+        String(a.s).padStart(5,'0') + ' · SECTOR ' + a.l + ' · ' + a.k + ' kills · ' + a.d +
+      '</li>').join('') +
+      '</ol>';
   }
   // r24: 暂停菜单
   showPauseMenu(){
@@ -1796,6 +2649,8 @@ class Battle extends Phaser.Scene {
     [bb,boss].forEach(el=>{ if(el){ el.pause(); el.volume=0.55; el._pauseVol=null; } });
     const tb=document.getElementById('titleBgm'); if(tb){ tb.volume=0.4; tb.currentTime=0; tb.play().catch(()=>{}); }
     document.getElementById('title').classList.remove('hidden');
+    window.__bt_syncResumeBtn && window.__bt_syncResumeBtn();                      // r38: 回 title 同步 RESUME 按钮
+    if(typeof _syncArmoryBtn === 'function') _syncArmoryBtn();                     // r43: 同步 ARMORY 按钮 credits 显示
   }
   // r23: 失败重生 — 从当前关重开,保留 score/kills/best
   retrySector(){
@@ -1831,7 +2686,142 @@ const game = new Phaser.Game({
   scene: Battle
 });
 function getScene(){ return game.scene.getScene('Battle'); }
-document.getElementById('startBtn').addEventListener('click',()=>{ const s=getScene(); s&&s.startGame(); });
+document.getElementById('startBtn').addEventListener('click',()=>{ const s=getScene(); if(s){ s._clearProgress && s._clearProgress(); s.startGame(); } });
+// r40: Codex Archive menu — 渲染 7 codex grid,已见正常显,未见 ? + grayscale
+function _renderCodexGrid(){
+  const grid = document.getElementById('codexGrid'); if(!grid) return;
+  const seen = (()=>{ try{ return new Set(JSON.parse(localStorage.getItem('bt_codex_seen')||'[]')); }catch(e){ return new Set(); } })();
+  // r41: 9 grid(7 grunt + 2 BOSS) — 3×3 排列,BOSS 在末行
+  const ORDER = ['soldier','runner','elite','brute','spitter','exploder','armored','tidelord','leviathan'];
+  const META = {
+    soldier:  { n:'Drowned Infantryman',     t:'Threat · Common' },
+    runner:   { n:'Drowned Runner',          t:'Threat · Frenzy' },
+    elite:    { n:'Drowned Vanguard',        t:'Threat · Commander' },
+    brute:    { n:'Drowned Brute',           t:'Threat · Heavy' },
+    spitter:  { n:'Drowned Spitter',         t:'Threat · Ranged' },
+    exploder: { n:'Drowned Husk',            t:'Threat · Suicide' },
+    armored:  { n:'Drowned Bulwark',         t:'Threat · Bulwark' },
+    tidelord: { n:'The Tidelord',            t:'BOSS V · APEX' },
+    leviathan:{ n:'Leviathan · Black Tide',  t:'BOSS X · APEX' },
+  };
+  grid.innerHTML = ORDER.map(t => {
+    const known = seen.has(t);
+    const m = META[t];
+    if(known){
+      return '<div style="background:linear-gradient(180deg,rgba(36,28,18,.92),rgba(28,22,14,.96));border:1px solid #6a5028;padding:8px;text-align:center">' +
+        '<img src="assets/codex/codex_'+t+'.png" alt="'+m.n+'" style="width:100%;height:180px;object-fit:cover;display:block;filter:contrast(1.05)">' +
+        '<div style="font-family:\'Black Ops One\',cursive;font-size:13px;color:#fff4cc;margin-top:8px;letter-spacing:1px">'+m.n+'</div>' +
+        '<div style="font-family:\'Oswald\',sans-serif;font-size:9px;color:#c64b3a;letter-spacing:2px;margin-top:3px;text-transform:uppercase">'+m.t+'</div>' +
+      '</div>';
+    } else {
+      return '<div style="background:rgba(8,12,14,.55);border:1px dashed #3a3a30;padding:8px;text-align:center;height:236px;display:flex;flex-direction:column;align-items:center;justify-content:center">' +
+        '<div style="font-family:\'Black Ops One\',cursive;font-size:64px;color:#3a3a30">?</div>' +
+        '<div style="font-family:\'Oswald\',sans-serif;font-size:10px;color:#5a5a50;letter-spacing:3px;margin-top:12px;text-transform:uppercase">Unknown · Not Encountered</div>' +
+      '</div>';
+    }
+  }).join('');
+}
+// r44: 渲染 Achievement grid(已解锁金色,未解锁灰锁)
+function _renderAchievementsGrid(){
+  const grid = document.getElementById('achievementGrid'); if(!grid || typeof ACHIEVEMENTS === 'undefined') return;
+  const seen = (()=>{ try{ return new Set(JSON.parse(localStorage.getItem('bt_ach')||'[]')); }catch(e){ return new Set(); } })();
+  grid.innerHTML = ACHIEVEMENTS.map(a => {
+    const unlocked = seen.has(a.id);
+    return '<div style="background:'+(unlocked?'linear-gradient(180deg,rgba(48,36,16,.94),rgba(36,28,12,.96))':'rgba(8,12,14,.55)')+';border:1px '+(unlocked?'solid #a07020':'dashed #3a3a30')+';padding:8px 10px;display:flex;gap:10px;align-items:center;min-height:48px">' +
+      '<div style="font-size:24px;opacity:'+(unlocked?'1':'0.35')+';width:32px;text-align:center">'+(unlocked?a.icon:'🔒')+'</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-family:\'Black Ops One\',cursive;font-size:11px;color:'+(unlocked?'#fff4cc':'#5a5a50')+';letter-spacing:1px">'+a.name+'</div>' +
+        '<div style="font-family:\'Courier New\',monospace;font-size:9px;color:'+(unlocked?'#c8b888':'#5a5a50')+';line-height:1.3;margin-top:2px">'+a.desc+'</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+document.getElementById('codexBtn').addEventListener('click',()=>{
+  _renderCodexGrid();
+  _renderAchievementsGrid();                                                                // r44
+  document.getElementById('title').classList.add('hidden');
+  document.getElementById('codexMenu').classList.remove('hidden');
+});
+// r43: Armory upgrade tree — 4 武器 3 级,credits 跨 run 持久化,升级后 _rebuildWeaponCache
+function _getCredits(){ try{ return +(localStorage.getItem('bt_credits')||0); }catch(e){ return 0; } }
+function _getUpgrades(){ try{ return JSON.parse(localStorage.getItem('bt_upgrades')||'{}'); }catch(e){ return {}; } }
+function _setUpgrades(u){ try{ localStorage.setItem('bt_upgrades', JSON.stringify(u)); }catch(e){} }
+function _setCredits(n){ try{ localStorage.setItem('bt_credits', String(Math.max(0,n))); }catch(e){} }
+const ARMORY_INFO = {
+  mg:      { name:'MG-42 Machine Gun', icon:'⛤', effects:['+15% damage', '+20 clip size'] },
+  shotgun: { name:'Trench Shotgun',    icon:'⊞', effects:['+15% damage', '+1 pellet'] },
+  rifle:   { name:'Sniper Rifle',      icon:'◎', effects:['+20% damage', '+60ms fire rate'] },
+  flamer:  { name:'Flamethrower',      icon:'☼', effects:['+12% damage', '+40 fuel'] },
+};
+function _renderArmoryGrid(){
+  const grid = document.getElementById('armoryGrid'); if(!grid) return;
+  const credits = _getCredits(), up = _getUpgrades();
+  document.getElementById('armoryCredits').textContent = credits;
+  document.getElementById('armoryBtnCredits').textContent = credits;
+  grid.innerHTML = ['mg','shotgun','rifle','flamer'].map(id => {
+    const info = ARMORY_INFO[id]; const lv = up[id] || 0; const maxed = lv >= 3; const canBuy = credits > 0 && !maxed;
+    const pips = [0,1,2].map(i => '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:'+(i<lv?'#d8b15a':'#3a3a30')+';margin:0 2px;border:1px solid #5a5a40"></span>').join('');
+    return '<div style="background:linear-gradient(180deg,rgba(36,28,18,.92),rgba(28,22,14,.96));border:1px solid #6a5028;padding:12px 14px;text-align:left">' +
+      '<div style="display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(216,177,90,.25);padding-bottom:6px;margin-bottom:8px">' +
+        '<div style="font-family:\'Black Ops One\',cursive;font-size:22px;color:#d8b15a">'+info.icon+'</div>' +
+        '<div style="font-family:\'Black Ops One\',cursive;font-size:14px;color:#fff4cc;flex:1">'+info.name+'</div>' +
+      '</div>' +
+      '<div style="text-align:center;margin:6px 0">'+pips+'</div>' +
+      '<div style="font-family:\'Courier New\',monospace;font-size:11px;color:#c8b888;line-height:1.5;margin:6px 0 10px;min-height:33px">'+
+        info.effects.map((e,i)=>'<div style="opacity:'+(i<lv?'1':'0.4')+'">'+ (i<lv?'✓ ':'· ') +e+' · LV'+(i+1)+'</div>').join('')+
+      '</div>' +
+      (maxed ? '<div style="font-family:\'Oswald\',sans-serif;font-size:11px;color:#5fae6a;text-align:center;padding:8px 0;letter-spacing:3px">★ MAX LEVEL ★</div>'
+             : '<button class="armoryUp" data-id="'+id+'" '+(canBuy?'':'disabled')+' style="width:100%;font-family:\'Oswald\',sans-serif;font-size:13px;letter-spacing:3px;background:'+(canBuy?'#a07020':'#3a3a30')+';color:'+(canBuy?'#fff4cc':'#6a6a60')+';border:none;padding:8px 0;cursor:'+(canBuy?'pointer':'not-allowed')+';text-transform:uppercase">UPGRADE · 1 CREDIT</button>') +
+    '</div>';
+  }).join('');
+  // 绑定 upgrade 按钮
+  grid.querySelectorAll('.armoryUp').forEach(btn => btn.addEventListener('click', e => {
+    const id = btn.getAttribute('data-id');
+    const cred = _getCredits(); const up2 = _getUpgrades(); const lv2 = up2[id] || 0;
+    if(cred < 1 || lv2 >= 3) return;
+    up2[id] = lv2 + 1; _setUpgrades(up2); _setCredits(cred - 1);
+    const s = getScene(); s && s._rebuildWeaponCache && s._rebuildWeaponCache();
+    _renderArmoryGrid();                                                // 重渲染显新状态
+    AudioFX.levelStinger && AudioFX.levelStinger();
+    // r44: arsenal_master 4 武器全 LV3 check
+    if(['mg','shotgun','rifle','flamer'].every(k => (up2[k]||0) >= 3) && s && s._unlockAch) s._unlockAch('arsenal_master');
+  }));
+}
+function _syncArmoryBtn(){
+  const cr = _getCredits();
+  const span = document.getElementById('armoryBtnCredits'); if(span) span.textContent = cr;
+}
+document.getElementById('armoryBtn').addEventListener('click',()=>{
+  _renderArmoryGrid();
+  document.getElementById('title').classList.add('hidden');
+  document.getElementById('armoryMenu').classList.remove('hidden');
+});
+document.getElementById('armoryBackBtn').addEventListener('click',()=>{
+  document.getElementById('armoryMenu').classList.add('hidden');
+  document.getElementById('title').classList.remove('hidden');
+  _syncArmoryBtn();
+  window.__bt_syncResumeBtn && window.__bt_syncResumeBtn();
+});
+// 启动同步一次
+setTimeout(()=>_syncArmoryBtn(), 1300);
+document.getElementById('codexBackBtn').addEventListener('click',()=>{
+  document.getElementById('codexMenu').classList.add('hidden');
+  document.getElementById('title').classList.remove('hidden');
+  window.__bt_syncResumeBtn && window.__bt_syncResumeBtn();
+});
+// r38: RESUME 按钮 — 从存档接关(level/score/kills 还原)+ 启动时检查 progress 显隐
+document.getElementById('resumeBtn').addEventListener('click',()=>{ const s=getScene(); if(!s)return;
+  const p = s._loadProgress(); if(p) s.startGame({level:p.lv, score:p.sc, kills:p.kl, best:p.bt}); });
+window.__bt_syncResumeBtn = function(){
+  const s=getScene(); if(!s)return; const p=s._loadProgress();
+  const btn=document.getElementById('resumeBtn'); if(!btn)return;
+  if(p && p.lv>=1 && p.lv<=10){
+    btn.textContent = '⏵ RESUME · SECTOR ' + p.lv + ' (' + String(p.sc).padStart(5,'0') + ' pts)';
+    btn.classList.remove('hidden');
+  } else { btn.classList.add('hidden'); }
+};
+// 启动后 + 每次 over/quit 回 title 都同步一次
+setTimeout(()=>window.__bt_syncResumeBtn && window.__bt_syncResumeBtn(), 1200);
 document.getElementById('retryBtn').addEventListener('click',()=>{ const s=getScene(); s&&s.startGame(); });
 document.getElementById('retrySectorBtn').addEventListener('click',()=>{ const s=getScene(); s&&s.retrySector(); });
 document.getElementById('resumeBtn').addEventListener('click',()=>{ const s=getScene(); s&&s.hidePauseMenu(); });
