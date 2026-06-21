@@ -259,23 +259,23 @@
 </div>
 
 <!-- r40: Codex Archive menu — 玩家主动浏览已见怪物档案,未见显 ? 占位 -->
-<div class="overlay hidden" id="codexMenu" style="background:radial-gradient(ellipse at center,#0c1014 0%,#02050a 100%);justify-content:flex-start;padding-top:48px">
+<div class="overlay hidden" id="codexMenu" style="background:radial-gradient(ellipse at center,#0c1014 0%,#02050a 100%);justify-content:flex-start;padding-top:48px;padding-bottom:100px;overflow-y:auto">
   <div style="font-family:'Black Ops One',cursive;font-size:clamp(28px,4vw,48px);letter-spacing:8px;color:#fff4cc;text-shadow:0 0 18px rgba(216,177,90,.4)">CYCLE 9 · FIELD ARCHIVE</div>
   <div style="font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:6px;color:#d8b15a;margin-top:10px;text-transform:uppercase">◆ Drowned Bestiary · Encountered Threats ◆</div>
   <div id="codexGrid" style="display:grid;grid-template-columns:repeat(3,180px);gap:18px;margin-top:32px;max-width:594px"></div>
   <!-- r44: Achievement section -->
   <div style="margin-top:24px;font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:5px;color:#ffd24a;text-transform:uppercase">◆ Achievements · Cycle Trophies ◆</div>
   <div id="achievementGrid" style="display:grid;grid-template-columns:repeat(3,180px);gap:10px;margin-top:14px;max-width:594px"></div>
-  <button class="cta" id="codexBackBtn" style="margin-top:30px;background:#3a3a30;color:#c3c8c4;padding:12px 36px;font-size:15px">↩ BACK TO TITLE</button>
+  <button class="cta" id="codexBackBtn" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);margin:0;background:#3a3a30;color:#c3c8c4;padding:12px 36px;font-size:15px;z-index:20;box-shadow:0 4px 18px rgba(0,0,0,.85)">↩ BACK TO TITLE</button>
 </div>
 
 <!-- r43: Armory upgrade tree — meta-progression 武器升级菜单 -->
-<div class="overlay hidden" id="armoryMenu" style="background:radial-gradient(ellipse at center,#0c1014 0%,#02050a 100%);justify-content:flex-start;padding-top:42px">
+<div class="overlay hidden" id="armoryMenu" style="background:radial-gradient(ellipse at center,#0c1014 0%,#02050a 100%);justify-content:flex-start;padding-top:42px;padding-bottom:100px;overflow-y:auto">
   <div style="font-family:'Black Ops One',cursive;font-size:clamp(28px,4vw,44px);letter-spacing:8px;color:#fff4cc;text-shadow:0 0 18px rgba(216,177,90,.4)">🔧 ARMORY · MARSHAL'S WORKBENCH</div>
   <div style="font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:5px;color:#d8b15a;margin-top:8px;text-transform:uppercase">◆ Spend Cycle Credits · Carry upgrades into the next cycle ◆</div>
   <div style="margin-top:14px;font-family:'Black Ops One',cursive;font-size:22px;color:#ffd24a">CREDITS · <span id="armoryCredits">0</span></div>
   <div id="armoryGrid" style="display:grid;grid-template-columns:repeat(2,300px);gap:18px;margin-top:24px;max-width:618px"></div>
-  <button class="cta" id="armoryBackBtn" style="margin-top:30px;background:#3a3a30;color:#c3c8c4;padding:12px 36px;font-size:15px">↩ BACK TO TITLE</button>
+  <button class="cta" id="armoryBackBtn" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);margin:0;background:#3a3a30;color:#c3c8c4;padding:12px 36px;font-size:15px;z-index:20;box-shadow:0 4px 18px rgba(0,0,0,.85)">↩ BACK TO TITLE</button>
 </div>
 
 <div class="overlay hidden" id="over">
