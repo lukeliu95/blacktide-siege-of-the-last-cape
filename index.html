@@ -798,6 +798,22 @@ const AudioFX = (() => {
   function telegraphDit(){ const a=ensure(); if(!a)return; const t=a.currentTime;
     const o=a.createOscillator(),g=a.createGain(); o.type='sine'; o.frequency.value=1100+Math.random()*180; env(g,t,0.001,0.045,0.035); o.connect(g).connect(bus(a)); o.start(t); o.stop(t+0.045);
   }
+  // r55: Eisen voice bark — 短促男声 grunt(formant 模拟,无真 voice asset),字幕 typewriter 每 N 字 trigger 一次
+  // triangle 基频 95-115Hz(男声 F0)+ bandpass 800Hz(共振峰 F1)+ 60ms 包络 = "嗯/啊" 节拍感
+  function eisenBark(){
+    const a=ensure(); if(!a)return; const t=a.currentTime;
+    const baseFreq = 95 + Math.random()*20;                          // 95-115Hz 男声基频微变
+    const o=a.createOscillator(), g=a.createGain(), bp=a.createBiquadFilter();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(baseFreq * 1.15, t);
+    o.frequency.linearRampToValueAtTime(baseFreq, t + 0.04);          // 略下滑模拟"语调结束"
+    bp.type = 'bandpass'; bp.frequency.value = 750 + Math.random()*180; bp.Q.value = 4.5;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.06, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.075);
+    o.connect(bp).connect(g).connect(bus(a));
+    o.start(t); o.stop(t + 0.085);
+  }
   // r27: 心跳音(危急时驱动)— 低频 thump + 二次轻 thump 模拟 "lub-dub"
   function heartbeat(intensity){
     const a=ensure(); if(!a)return; const t=a.currentTime;
@@ -834,7 +850,7 @@ const AudioFX = (() => {
        const m=localStorage.getItem('bt_mute'); if(m==='1')_muted=true; }catch(e){}
   return {
     setMasterVolume, setMuted, getMasterVolume, getMuted, _applyVol,
-    telegraphDit, heartbeat, setWorldWidth, panTo, levelStinger, bossStinger, setSceneAcoustic, stopSceneAmbience,
+    telegraphDit, heartbeat, eisenBark, setWorldWidth, panTo, levelStinger, bossStinger, setSceneAcoustic, stopSceneAmbience,
     diveIn, diveOut, bossRoar, bossHit, bossPhase, bossDeath,
     headshot, ammoPickup, healPickup, boostPickup, reloadDone, lowAmmoTick, bgmCrossfade,
     startBGM, stopBGM, roar,
@@ -2243,6 +2259,10 @@ class Battle extends Phaser.Scene {
         return; }
       const ch=text[i]; el.textContent += ch;
       if(/\S/.test(ch) && (i%2===0)) AudioFX.telegraphDit && AudioFX.telegraphDit();
+      // r55: Eisen voice bark — 每 6 个非空格字符 + 句末标点 trigger 1 grunt "说话"节拍感
+      if(/[.!?,]/.test(ch) || (i>0 && i%6===0 && /\S/.test(ch))){
+        AudioFX.eisenBark && AudioFX.eisenBark();
+      }
       i++;
     }, speed);
   }
@@ -2413,6 +2433,26 @@ class Battle extends Phaser.Scene {
     const p=document.getElementById('eisenPortrait');
     if(p){ p.style.filter='drop-shadow(0 0 14px rgba(255,60,40,0.95)) contrast(1.25) saturate(1.4)'; p.style.transform='scale(1.10)';
       setTimeout(()=>{ p.style.filter='drop-shadow(0 2px 6px rgba(0,0,0,.7)) contrast(1.08)'; p.style.transform='scale(1)'; }, level===2?900:600);
+    }
+    // r55: BOSS HP bar 分段闪 + scale yoyo + 边框红 tint(强化 phase 仪式)
+    if(this.bossHpFill && this.bossHpFill.visible){
+      // 三段闪:bar 中央放大 1→1.15→1 yoyo + 红 tint setFillStyle(临时)+ 边框 stroke 红闪
+      this.tweens.killTweensOf(this.bossHpFill);
+      const origFillColor = this.bossHpFill.fillColor;
+      const flashColor = level===2 ? 0xff1a1a : 0xffaa1a;
+      this.bossHpFill.setFillStyle(flashColor);
+      this.tweens.add({targets:this.bossHpFill, scaleY:1.55, duration:140, yoyo:true, repeat:2, ease:'Quad.easeOut',
+        onComplete:()=>{ this.bossHpFill.scaleY=1; this.bossHpFill.setFillStyle(origFillColor); }});
+      // bossHpBack 边框红闪 3 次
+      if(this.bossHpBack){
+        const origStroke = 0xc23a3a;
+        const flashStroke = level===2 ? 0xff3a2a : 0xffd24a;
+        let flashes = 0;
+        const ev = this.time.addEvent({ delay: 130, repeat: 5, callback: ()=>{
+          this.bossHpBack.setStrokeStyle(flashes%2===0 ? 3 : 2, flashes%2===0 ? flashStroke : origStroke);
+          flashes++; if(flashes>5) this.bossHpBack.setStrokeStyle(2, origStroke);
+        }});
+      }
     }
     const bx=z.spr.x, by=z.spr.getBounds().centerY;
     for(let i=0;i<2;i++){
