@@ -1290,8 +1290,12 @@ class Battle extends Phaser.Scene {
     this.bossHpBack=this.add.rectangle(DW/2,92,720,22,0x1a0d0c,1).setOrigin(0.5,0).setDepth(92).setStrokeStyle(2,0xc23a3a).setVisible(false);
     this.bossHpFill=this.add.rectangle(DW/2-358,96,716,14,0xff3a2a,1).setOrigin(0,0).setDepth(93).setVisible(false);
     this.bossHpTicks=this.add.graphics().setDepth(94).setVisible(false);
-    this.bossHpTicks.fillStyle(0xfff4cc,0.6);
-    [0.33,0.66].forEach(p=>this.bossHpTicks.fillRect(DW/2-358+716*p-1,96,2,14));
+    // r56: phase 阈值竖线 + label 增强(从 2px 0.6 alpha → 3px 0.95 alpha + 上方 P2/P3 label)
+    this.bossHpTicks.fillStyle(0xfff4cc, 0.95);
+    [0.33, 0.66].forEach(p => this.bossHpTicks.fillRect(DW/2-358 + 716*p - 1, 94, 3, 18));
+    // P2 (66% 标线) / P3 (33% 标线) 标签
+    this.bossHpP2Label = this.add.text(DW/2 - 358 + 716*0.66, 80, 'P2', {fontFamily:'"Black Ops One",cursive', fontSize:'10px', color:'#ffd24a', stroke:'#3a0a0a', strokeThickness:2}).setOrigin(0.5).setDepth(94).setVisible(false);
+    this.bossHpP3Label = this.add.text(DW/2 - 358 + 716*0.33, 80, 'P3', {fontFamily:'"Black Ops One",cursive', fontSize:'10px', color:'#ff8c2a', stroke:'#3a0a0a', strokeThickness:2}).setOrigin(0.5).setDepth(94).setVisible(false);
     // —— 屏边连击脉冲层(combo>=5/10/15 闪)——
     this.edgePulse=this.add.graphics().setDepth(70).setBlendMode('ADD').setAlpha(0);
     this.edgePulse.fillGradientStyle(0xff3a2a,0xff3a2a,0,0,1,1);
@@ -1344,6 +1348,7 @@ class Battle extends Phaser.Scene {
     this._bloodlustT=0; this._headshotChain=[];                       // r47
     this._fireHeat=0; this._overheatT=0;                              // r51 overheat
     if(this._srZoomActive) this._exitSRZoom && this._exitSRZoom();    // r54 SR zoom 复位
+    this._flAltCooldown = 0;                                          // r56 FL alt cooldown 清
     if(this.phaseVig)this.phaseVig.setAlpha(0);
     const _bb=document.getElementById('bossBgm'); _bb&&_bb.pause();
     if(this.slowVig)this.slowVig.setAlpha(0);
@@ -1356,6 +1361,8 @@ class Battle extends Phaser.Scene {
     this.input.on('pointerdown',p=>{ AudioFX.shot && 0; this.cross.setPosition(p.x,p.y);
       // r54: SR 右键长按 zoom 瞄准镜
       if(p.button === 2 && this.weapon && this.weapon().id === 'rifle'){ this._enterSRZoom && this._enterSRZoom(); return; }
+      // r56: FL 右键 = 扇形 AOE 一次性扩散攻击
+      if(p.button === 2 && this.weapon && this.weapon().id === 'flamer'){ this._flAltFire && this._flAltFire(); return; }
       this.firing=true; if(this.state==='play')this.tryFire();
     });
     this.input.on('pointerup',p=>{
@@ -2132,6 +2139,42 @@ class Battle extends Phaser.Scene {
       }
     }
   }
+  // r56: FL 右键扇形 AOE — 5 shots 在准星 ±30° 扇形分散 + ammo cost 5 + 1.5s cooldown
+  _flAltFire(){
+    if(this.state !== 'play' || this._flAltCooldown > 0) return;
+    const w = this.weapon();
+    if(w.id !== 'flamer' || this.reloading) return;
+    if(this.ammo < 5){ AudioFX.dry && AudioFX.dry(); return; }
+    this._flAltCooldown = 1.5;
+    this.ammo -= 5;
+    AudioFX[w.sfx] && AudioFX[w.sfx](this.muzzleX);
+    AudioFX[w.sfx] && setTimeout(()=>AudioFX[w.sfx](this.muzzleX), 60);     // 第二爆 audio layer
+    // 准星位置 = cross.xy,扇形 5 shots 在 ±30° 分散
+    const cx = this.cross.x, cy = this.cross.y;
+    const mx = this.muzzleX, my = this.muzzleY;
+    const baseAngle = Math.atan2(cy - my, cx - mx);
+    const SPREAD = Math.PI / 6;                                              // 30° 半扇 = 60° 总扇
+    for(let i = 0; i < 5; i++){
+      const t = i / 4;                                                       // 0..1
+      const ang = baseAngle + (t - 0.5) * SPREAD;
+      const dist = Math.hypot(cx - mx, cy - my);
+      const px = mx + Math.cos(ang) * dist;
+      const py = my + Math.sin(ang) * dist;
+      this.hitAt(px, py, w);
+      // 弹道 tracer 5 条扇形
+      if(this.addTracer) this.addTracer(mx, my, px, py, w);
+      else {
+        const tracer = this.add.graphics().setDepth(60);
+        tracer.lineStyle(2, 0xffd24a, 0.8); tracer.beginPath(); tracer.moveTo(mx,my); tracer.lineTo(px,py); tracer.strokePath();
+        this.tweens.add({targets:tracer, alpha:0, duration:280, onComplete:()=>tracer.destroy()});
+      }
+    }
+    // 屏中央 banner "🔥 FAN BURST" 短显
+    if(this.banner){ this.banner.setText('🔥 FAN BURST').setAlpha(0).setScale(0.6);
+      this.tweens.add({targets:this.banner, alpha:1, scale:1, duration:160, ease:'Back.easeOut'});
+      this.tweens.add({targets:this.banner, alpha:0, duration:400, delay:600}); }
+    if(this.cameras && this.cameras.main) this.cameras.main.shake(220, 0.012);
+  }
   // r54: SR 瞄准镜 zoom — 右键长按 cam zoomTo 1.5 + 准星 scale 0.6 + 后坐减半;退则还原
   _enterSRZoom(){
     if(this._srZoomActive || this.state !== 'play') return;
@@ -2778,6 +2821,7 @@ class Battle extends Phaser.Scene {
     // r51: overheat tick — 不持续 fire 时 _fireHeat 慢冷却,_overheatT 减
     if(!this.firing && (this._fireHeat||0) > 0) this._fireHeat = Math.max(0, this._fireHeat - dt*1.2);
     if((this._overheatT||0) > 0){ this._overheatT = Math.max(0, this._overheatT - dt); }
+    if((this._flAltCooldown||0) > 0) this._flAltCooldown = Math.max(0, this._flAltCooldown - dt);  // r56 FL alt cooldown
     if(this.reloading){ this.reloadT-=dt; if(this.reloadT<=0){ this.reloading=false; this.ammo=this.clip; AudioFX.reloadDone();
       this._reloadDoneSweep && this._reloadDoneSweep();                                  // r46: 金光 sweep
     } }
@@ -2991,7 +3035,7 @@ class Battle extends Phaser.Scene {
     if(this.activeBoss && !this.activeBoss.dead && this.bossHpFill){
       const bz=this.activeBoss, p=Math.max(0,bz.hp/bz.maxhp);
       if(!this.bossHpFill.visible){
-        [this.bossHpName,this.bossHpSub,this.bossHpBack,this.bossHpFill,this.bossHpTicks].forEach(o=>o.setVisible(true));
+        [this.bossHpName,this.bossHpSub,this.bossHpBack,this.bossHpFill,this.bossHpTicks,this.bossHpP2Label,this.bossHpP3Label].forEach(o=>o.setVisible(true));
         this.bossHpName.setText('☠  '+bz.cfg.bossName+'  ☠').setScale(0.6).setAlpha(0);
         // r28-fix: 用 width 入场动画(不用 scaleX),与后续 update tween 同 prop 不打架;入场期间禁 update
         this.bossHpFill.scaleX = 1;                              // 确保 scaleX 复位(防 r22 旧残留)
@@ -3007,7 +3051,7 @@ class Battle extends Phaser.Scene {
       }
       this.bossHpFill.fillColor = p>0.66?0xff3a2a:p>0.33?0xff8c2a:0xffd24a;
     } else if(this.bossHpFill && this.bossHpFill.visible){
-      [this.bossHpName,this.bossHpSub,this.bossHpBack,this.bossHpFill,this.bossHpTicks].forEach(o=>o.setVisible(false));
+      [this.bossHpName,this.bossHpSub,this.bossHpBack,this.bossHpFill,this.bossHpTicks,this.bossHpP2Label,this.bossHpP3Label].forEach(o=>o.setVisible(false));
       this._bossHpEntering = false;
     }
   }
