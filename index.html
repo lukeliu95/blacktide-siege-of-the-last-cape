@@ -2011,6 +2011,10 @@ class Battle extends Phaser.Scene {
       hit.spr.setTintFill(0xffffff); this.time.delayedCall(40,()=>{ if(!hit.dead)hit.spr.setTint(hit.cfg.tint); });
       this.dmgFloat(px+rnd(-8,8), py-6, dmg, head, hit.cfg && hit.cfg.boss);
       if(head) AudioFX.headshot();         // r22: HEADSHOT 标签由 dmgFloat crit 内置,移除冗余 floatText
+      // r46: Critical hit visual — head + dmg≥20 触发 80ms freeze + 红 flash + 大字 CRITICAL + camera punch
+      if(head && dmg >= 20){
+        this._critHit && this._critHit(px, py);
+      }
       if(hit.hp<=0){ this.kill(hit,px,py);
         if(head){ const slow=this.maybeHeadshotCam(px,py); if(!slow)this.miniHeadshotFx(px,py); } } }
   }
@@ -2031,6 +2035,40 @@ class Battle extends Phaser.Scene {
       lbl.setLetterSpacing && lbl.setLetterSpacing(3);
       this.tweens.add({targets:lbl,alpha:1,y:lbl.y-12,duration:160});
       this.tweens.add({targets:lbl,alpha:0,duration:500,delay:400,onComplete:()=>lbl.destroy()});
+    }
+  }
+  // r46: Reload 完成金光 sweep — 在 ammoFill 区域横扫 320ms + ammo 数字 1.2× 弹缩
+  _reloadDoneSweep(){
+    if(!this.ammoFill) return;
+    // ammoFill 位置:DW-26-208 起点,206 宽,DH-58 中心,4 高度
+    const baseX = DW-26-208, midY = DH-58;
+    const sweep = this.add.rectangle(baseX - 24, midY, 24, 12, 0xfff4cc, 0.95).setOrigin(0, 0.5).setDepth(95).setBlendMode('ADD');
+    this.tweens.add({ targets:sweep, x: baseX + 206, duration: 320, ease:'Cubic.easeOut',
+      onUpdate: ()=>{ sweep.alpha = 0.95; },
+      onComplete: ()=>{ this.tweens.add({targets:sweep, alpha:0, duration:140, onComplete:()=>sweep.destroy()}); }
+    });
+    // ammo 数字 1.2× 弹缩
+    if(this.hudAmmo){ this.hudAmmo.setScale(1.2);
+      this.tweens.add({targets:this.hudAmmo, scale:1, duration:200, ease:'Back.easeOut'});
+    }
+  }
+  // r46: Critical hit — 高伤爆头触发:80ms 玩法 freeze + 红 flash + 'CRITICAL' 大字 + camera punch zoom
+  _critHit(x, y){
+    this._phaseFreeze = 0.08;                                          // 复用 r22 punch frame 机制
+    // 红 flash 短促 220ms
+    if(this.flash){ this.flash.setAlpha(0); const f=this.flash; f.fillColor=0xff3a2a; this.tweens.killTweensOf(f);
+      this.tweens.add({targets:f, alpha:0.55, duration:60, yoyo:true, onComplete:()=>{ f.alpha=0; f.fillColor=0xdfe9ff; }});
+    }
+    // 'CRITICAL' 大字 Back.easeOut 弹出
+    const t = this.add.text(x, y - 50, 'CRITICAL', {fontFamily:'"Black Ops One",cursive', fontSize:'30px', color:'#ff5a3a', stroke:'#3a0a0a', strokeThickness:4}).setOrigin(0.5).setDepth(89).setScale(0.3).setAngle(rnd(-6, 6));
+    t.setLetterSpacing && t.setLetterSpacing(3);
+    this.tweens.add({targets:t, scale:1.15, duration:160, ease:'Back.easeOut'});
+    this.tweens.add({targets:t, y:y-95, alpha:0, duration:680, delay:180, ease:'Cubic.easeOut', onComplete:()=>t.destroy()});
+    // camera punch zoom 1→1.06→1
+    if(this.cameras && this.cameras.main){
+      const cam = this.cameras.main;
+      this.tweens.add({targets:cam, zoom:1.06, duration:60, yoyo:true, ease:'Quad.easeOut'});
+      cam.shake(120, 0.008);
     }
   }
   miniHeadshotFx(x,y){
@@ -2354,7 +2392,9 @@ class Battle extends Phaser.Scene {
     if(this.firing)this.tryFire();
     if(this._flameOnT>0){ this._flameOnT-=dt; if(this._flameOnT<=0 && this.flameSpr){ this.flameSpr.setVisible(false); this.flameSpr.anims.stop(); } }
     this.cooldown=Math.max(0,this.cooldown-dt);
-    if(this.reloading){ this.reloadT-=dt; if(this.reloadT<=0){ this.reloading=false; this.ammo=this.clip; AudioFX.reloadDone(); } }
+    if(this.reloading){ this.reloadT-=dt; if(this.reloadT<=0){ this.reloading=false; this.ammo=this.clip; AudioFX.reloadDone();
+      this._reloadDoneSweep && this._reloadDoneSweep();                                  // r46: 金光 sweep
+    } }
     if(!this.reloading && this.ammo>0 && this.ammo<=Math.max(2, this.clip*0.10) && this.firing){ AudioFX.lowAmmoTick();
       this._maybeMidbattleLine && this._maybeMidbattleLine('ammoLow'); }   // r40: ammo<10% Eisen 中场提示
     if(this.comboT>0){ this.comboT-=dt; if(this.comboT<=0)this.combo=0; }
