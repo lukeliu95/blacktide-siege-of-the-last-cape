@@ -1445,6 +1445,8 @@ class Battle extends Phaser.Scene {
     this.spawn(type); const z=this.zombies[this.zombies.length-1];
     z.x0=DW*0.5; z.emerge=0;                                                     // BOSS 中央登场
     this.activeBoss = z;
+    // r53: BOSS encounter intro shot — 1.6s zoom + slow-mo + 大字标题 仪式感前置
+    this._showBossIntroShot && this._showBossIntroShot(z);
     this.showBanner('☠ '+z.cfg.bossName+' ☠');
     this.cameras.main.shake(700,0.015); AudioFX.bossRoar(type, DW/2); AudioFX.thunder();
     const bb=document.getElementById('battleBgm'), boss=document.getElementById('bossBgm');
@@ -1464,6 +1466,37 @@ class Battle extends Phaser.Scene {
       const e = this.zombies[this.zombies.length-1];
       if(e){ e.emerge=0; e.roared=true; e._isBossEscort=true; }
     }));
+  }
+  // r53: BOSS encounter intro shot — 1.6s zoom-in + slow-mo + 中央大字 "☠ BOSS · NAME ☠" Back.easeOut 弹入
+  _showBossIntroShot(z){
+    if(!z || !z.cfg) return;
+    const bossName = z.cfg.bossName || z.type.toUpperCase();
+    // slow-mo 1s + dive in lp
+    this.slowmoT = Math.max(this.slowmoT||0, 1.0);
+    if(this.slowVig) this.slowVig.setAlpha(0.55);
+    AudioFX.diveIn && AudioFX.diveIn();
+    // camera zoomTo 1.5 + pan to bunker center (BOSS 还没真显时不能 pan to z.spr.x,用 DW/2)
+    if(this.cameras && this.cameras.main){
+      const cam = this.cameras.main;
+      cam.pan(DW/2, DH*0.45, 600, 'Cubic.easeOut');
+      cam.zoomTo(1.45, 600, 'Cubic.easeOut');
+    }
+    // 中央大字 "☠ BOSS · NAME ☠" Back.easeOut 弹入
+    const t = this.add.text(DW/2, DH*0.40, '☠ BOSS · ' + bossName + ' ☠', {
+      fontFamily:'"Black Ops One",cursive', fontSize:'34px', color:'#ff3a2a',
+      stroke:'#3a0a0a', strokeThickness:4
+    }).setOrigin(0.5).setDepth(95).setScale(0.4).setAlpha(0);
+    t.setLetterSpacing && t.setLetterSpacing(5);
+    this.tweens.add({targets:t, scale:1.0, alpha:1, duration:380, ease:'Back.easeOut'});
+    this.tweens.add({targets:t, alpha:0, duration:540, delay:1080, ease:'Sine.easeIn', onComplete:()=>t.destroy()});
+    // 1.6s 后 cam zoomTo 1.0 + pan center 还原
+    this.time.delayedCall(1600, ()=>{
+      if(this.cameras && this.cameras.main){
+        this.cameras.main.zoomTo(1.0, 320, 'Quad.easeOut');
+        this.cameras.main.pan(DW/2, DH/2, 320, 'Quad.easeOut');
+      }
+      if(this.slowVig) this.slowVig.setAlpha(0);
+    });
   }
   // r33: adaptive escort 池 — 每 1s 数 escort,缺则补
   _tickBossEscorts(dt){
@@ -3134,30 +3167,39 @@ document.getElementById('armoryBackBtn').addEventListener('click',()=>{
 });
 // 启动同步一次
 setTimeout(()=>_syncArmoryBtn(), 1300);
-// r49: Daily login bonus — 每日首次启动给 +2 Cycle Credits,localStorage bt_last_login 跟踪
+// r49 + r53: Daily login bonus + streak — 连续 N 天登录给 +N+1 credits 递进(上限 8)
 function _checkDailyLogin(){
   try{
     const today = new Date().toISOString().slice(0,10);            // yyyy-mm-dd
     const last = localStorage.getItem('bt_last_login') || '';
     if(last === today) return;                                     // 今天已 claim
+    // r53: streak 计算 — last === yesterday → streak++; else reset 1
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0,10);
+    let streak = +(localStorage.getItem('bt_login_streak')||0);
+    if(last === yesterday) streak = Math.min(7, streak + 1);
+    else streak = 1;
+    localStorage.setItem('bt_login_streak', String(streak));
     localStorage.setItem('bt_last_login', today);
     const cur = +(localStorage.getItem('bt_credits')||0);
-    const bonus = 2;
+    const bonus = Math.min(8, 1 + streak);                          // 1day=2 / 2day=3 / 7day=8
     localStorage.setItem('bt_credits', cur + bonus);
-    _syncArmoryBtn();                                              // 立刻更新 ARMORY · N CREDITS 显示
-    // 显示 banner(title screen 不可见时仍弹,因 daily 是 game-wide)
+    _syncArmoryBtn();
+    // 显示 banner — streak ≥ 3 时金色加亮 + flame emoji
+    const fire = streak >= 3 ? '🔥 ' : '';
+    const streakTxt = streak >= 2 ? '<div style="font-family:Oswald,sans-serif;font-size:10px;color:'+(streak>=5?'#ff8c2a':'#ffd24a')+';margin-top:4px;letter-spacing:5px">'+fire+streak+'-DAY STREAK · KEEP COMING BACK</div>' : '';
     const b = document.createElement('div');
     b.style.cssText = 'position:fixed;top:24vh;left:50%;transform:translateX(-50%) translateY(-30px);z-index:60;'+
       'background:linear-gradient(180deg,rgba(48,36,16,.96),rgba(36,28,12,.98));'+
-      'border:1px solid #a07020;box-shadow:0 4px 32px rgba(216,177,90,.4);'+
+      'border:1px solid '+(streak>=5?'#ff8c2a':'#a07020')+';box-shadow:0 4px 32px rgba(216,177,90,'+(0.4+streak*0.05)+');'+
       'padding:14px 26px;font-family:"Black Ops One",cursive;color:#ffd24a;'+
       'font-size:18px;letter-spacing:3px;text-align:center;'+
       'opacity:0;transition:opacity .5s ease, transform .5s cubic-bezier(.22,1,.36,1)';
     b.innerHTML = '🎁 DAILY BONUS · +'+bonus+' CYCLE CREDITS' +
-      '<div style="font-family:Oswald,sans-serif;font-size:11px;color:#c8b888;margin-top:6px;letter-spacing:4px">Spend at the Armory · Welcome back, Marshal.</div>';
+      '<div style="font-family:Oswald,sans-serif;font-size:11px;color:#c8b888;margin-top:6px;letter-spacing:4px">Spend at the Armory · Welcome back, Marshal.</div>' +
+      streakTxt;
     document.body.appendChild(b);
     requestAnimationFrame(()=>{ b.style.opacity='1'; b.style.transform='translateX(-50%) translateY(0)'; });
-    setTimeout(()=>{ b.style.opacity='0'; setTimeout(()=>b.remove(), 600); }, 3600);
+    setTimeout(()=>{ b.style.opacity='0'; setTimeout(()=>b.remove(), 600); }, 4200);
   }catch(e){}
 }
 setTimeout(()=>_checkDailyLogin(), 1400);                          // 1.4s 让 ARMORY btn 先 sync
