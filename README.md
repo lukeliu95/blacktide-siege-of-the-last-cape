@@ -35,7 +35,7 @@ The game blends arcade-feel gunplay with cinematic presentation: real orchestral
 
 中文简介：单文件浏览器原生电影化 FPS。玩家扮演 **Marshal Eisen**，在 Last Cape 灯塔进行 10 关守城战（约 5 分钟可通关）。游戏融合街机射击手感与电影化叙事——真管弦配乐 / AI 生成的 4K 真人风贴图 / 章节过场视频 / 10 章艾森手记。
 
-**Live Demo · 在线试玩**: `[PLACEHOLDER · filled in by Workflow Verify stage]`
+**Live Demo · 在线试玩**: **<https://normandy-bunker-shooter.vercel.app>** (Vercel · deploy 自动接 GitHub)
 
 ---
 
