@@ -255,7 +255,8 @@
   <button class="cta" id="startBtn">▶ Enter the Battlefield</button>
   <button class="cta" id="codexBtn" style="background:#2a2820;color:#d8b15a;margin-top:14px;font-size:16px;padding:12px 32px">📖 FIELD ARCHIVE</button>
   <button class="cta" id="armoryBtn" style="background:#2a2820;color:#d8b15a;margin-top:10px;font-size:16px;padding:12px 32px">🔧 ARMORY · <span id="armoryBtnCredits">0</span> CREDITS</button>
-  <div class="controls"><b>Mouse</b> Aim · <b>Hold LMB</b> Fire · <b>1-4</b> Switch Weapon · <b>R</b> Reload · <b>P</b> Pause</div>
+  <button class="cta" id="difficultyBtn" style="background:#2a2820;color:#d8b15a;margin-top:10px;font-size:14px;padding:10px 28px;letter-spacing:3px">⚙ DIFFICULTY · <span id="difficultyTxt">NORMAL</span></button>
+  <div class="controls"><b>Mouse</b> Aim · <b>LMB</b> Fire · <b>RMB</b> Alt(SR Zoom / FL Fan) · <b>1-4</b> Weapon · <b>R</b> Reload · <b>P</b> Pause · <b>Tab</b> Skip Eisen · <b>M</b> Mute</div>
 </div>
 
 <!-- r40: Codex Archive menu — 玩家主动浏览已见怪物档案,未见显 ? 占位 -->
@@ -1376,6 +1377,7 @@ class Battle extends Phaser.Scene {
     this.input.keyboard.on('keydown-P',()=>{ if(this.state==='play')this.showPauseMenu(); else if(this.state==='pause')this.hidePauseMenu(); });
     this.input.keyboard.on('keydown-ESC',()=>{ if(this.state==='play')this.showPauseMenu(); else if(this.state==='pause')this.hidePauseMenu(); });
     this.input.keyboard.on('keydown-SPACE',()=>{ if(this.state==='play')this.tryFire(); });
+    this.input.keyboard.on('keydown-TAB',()=>{ this._eisenSkip && this._eisenSkip(); });   // r57: Tab 跳 Eisen 字幕
     // 武器切换:数字键 1-4 / 滚轮
     ['ONE','TWO','THREE','FOUR'].forEach((kc,i)=>this.input.keyboard.on('keydown-'+kc,()=>{ if(this.state==='play')this.switchWeapon(i); }));
     this.input.on('wheel',(p,go,dx,dy)=>{ if(this.state!=='play')return; this.switchWeapon((this.weaponIdx+(dy>0?1:WEAPONS.length-1))%WEAPONS.length); });
@@ -1383,6 +1385,10 @@ class Battle extends Phaser.Scene {
 
   startGame(opts){ this.resetState(); this.state='play'; AudioFX.wave();
     this._rebuildWeaponCache && this._rebuildWeaponCache();                  // r43: Armory upgrades 应用
+    // r57: 难度倍率 apply(zombie hp + spawn count)
+    const DIFF = { EASY:{hpMul:0.65, spawnMul:0.75}, NORMAL:{hpMul:1.0, spawnMul:1.0}, HARD:{hpMul:1.4, spawnMul:1.25} };
+    let d = 'NORMAL'; try{ d = localStorage.getItem('bt_difficulty') || 'NORMAL'; }catch(e){}
+    this._diff = DIFF[d] || DIFF.NORMAL;
     // r38: resume — opts={level,score,kills,best} 从存档还原(否则全新开局)
     if(opts && opts.level && opts.level>=1 && opts.level<=10){
       this.level = opts.level;
@@ -1419,10 +1425,10 @@ class Battle extends Phaser.Scene {
     const isBossWave = (W===this.wavesForLevel(L)) && (L===5 || L===10);
     const isFinalPush = (W===this.wavesForLevel(L)) && !isBossWave;             // 关末非 BOSS = micro-climax
     // 三段式难度:教学 L1-3 / 中段 L4-7 / 高潮 L8-10
-    const n = isBossWave ? 3
-      : L<=3 ? (4 + W*1)              // 教学:5/6/7
-      : L<=7 ? (7 + W*1)              // 中段:8/9/10
-      : (10 + W*2);                   // 高潮:12/14/16
+    // r57: 难度 spawnMul 影响杂兵 wave 数,BOSS wave 固定 3 不动
+    const _spawnMul = (this._diff && this._diff.spawnMul) || 1;
+    const _nBase = L<=3 ? (4 + W*1) : L<=7 ? (7 + W*1) : (10 + W*2);
+    const n = isBossWave ? 3 : Math.max(2, Math.round(_nBase * _spawnMul));
     const intervalMul = isFinalPush ? 0.7 : 1.0;                                // FINAL PUSH 压 30% spawn 间隔
     // r34: L4 / L8 cliff smoothing — 首波"接触波"只放 1 个新兵种代表,其余降级到上一关池
     const isCliffContact = (L===4 && W===1) || (L===8 && W===1);
@@ -1982,7 +1988,9 @@ class Battle extends Phaser.Scene {
       const tx=this.textures.exists(cfg.tex)?cfg.tex:'z_soldier';
       spr=this.add.image(x, HORIZON_Y, tx).setOrigin(0.5,1).setTint(cfg.tint);
     }
-    const z={ spr, type, cfg, p:0, hp:cfg.hp, maxhp:cfg.hp, x0:x, step:rnd(0,6.28),
+    const _hpMul = (this._diff && this._diff.hpMul) || 1;                   // r57 难度 hp 倍率
+    const _hp = cfg.boss ? cfg.hp : Math.round(cfg.hp * _hpMul);            // BOSS hp 不动(已固定调好)
+    const z={ spr, type, cfg, p:0, hp:_hp, maxhp:_hp, x0:x, step:rnd(0,6.28),
               atkT:0, dead:false, emerge:1, animated, roared:false, _pulsing:false, _sxNow:1, _syNow:1, shadow:null,
               // r28: leviathan sprite cell 360 内容居中带 padding,需补偿到原贴图视效
               _scaleBoost: (type==='leviathan' && this.textures.exists('z_boss_leviathan_anim')) ? 2.0 : 1 };
@@ -2294,10 +2302,11 @@ class Battle extends Phaser.Scene {
     if(!wrap||!el)return;
     clearTimeout(this._eisenHideT); clearInterval(this._eisenTypeI);
     el.textContent=''; wrap.style.opacity='1';
+    this._eisenFullText = text;                                              // r57: 缓存 full text 给 Tab 跳过用
     // 逐字打印 + 每字符电报机滴音(空格/标点不发音)
     let i=0; const speed=42;                                                // ms/char
     this._eisenTypeI=setInterval(()=>{
-      if(i>=text.length){ clearInterval(this._eisenTypeI);
+      if(i>=text.length){ clearInterval(this._eisenTypeI); this._eisenTypeI=null;
         this._eisenHideT=setTimeout(()=>{ wrap.style.opacity='0'; }, 2400);
         return; }
       const ch=text[i]; el.textContent += ch;
@@ -2308,6 +2317,22 @@ class Battle extends Phaser.Scene {
       }
       i++;
     }, speed);
+  }
+  // r57: Eisen 字幕 Tab 跳过 — typewriter 中 → 立刻显完整文本;已完 → 立刻 fade-out
+  _eisenSkip(){
+    const wrap=document.getElementById('eisenWrap'), el=document.getElementById('eisenLine');
+    if(!wrap||!el) return;
+    if(this._eisenTypeI){
+      // 跑中:停 typewriter + 立刻显完整 text + 缩短 hide 到 1.0s
+      clearInterval(this._eisenTypeI); this._eisenTypeI=null;
+      if(this._eisenFullText) el.textContent = this._eisenFullText;
+      clearTimeout(this._eisenHideT);
+      this._eisenHideT = setTimeout(()=>{ wrap.style.opacity='0'; }, 1000);
+    } else if(wrap.style.opacity === '1' || wrap.style.opacity === ''){
+      // 已完显:立刻 fade-out
+      clearTimeout(this._eisenHideT);
+      wrap.style.opacity='0';
+    }
   }
   nextScene(){ let n=this.sceneIdx; for(let i=0;i<SCENES.length;i++){ n=(n+1)%SCENES.length; if(this.textures.exists(SCENES[n].key))break; }
     if(n===this.sceneIdx)return; const sc=SCENES[n]; this.sceneIdx=n;
@@ -3300,6 +3325,22 @@ document.getElementById('armoryBackBtn').addEventListener('click',()=>{
 });
 // 启动同步一次
 setTimeout(()=>_syncArmoryBtn(), 1300);
+// r57: 玩家自定义难度 — EASY/NORMAL/HARD 三档循环切换,localStorage 持久化
+const DIFFICULTIES = ['EASY','NORMAL','HARD'];
+function _getDifficulty(){ try{ return localStorage.getItem('bt_difficulty') || 'NORMAL'; }catch(e){ return 'NORMAL'; } }
+function _setDifficulty(d){ try{ localStorage.setItem('bt_difficulty', d); }catch(e){} }
+function _syncDifficultyBtn(){
+  const txt = document.getElementById('difficultyTxt');
+  if(txt) txt.textContent = _getDifficulty();
+}
+document.getElementById('difficultyBtn').addEventListener('click',()=>{
+  const cur = _getDifficulty();
+  const next = DIFFICULTIES[(DIFFICULTIES.indexOf(cur)+1) % 3];
+  _setDifficulty(next);
+  _syncDifficultyBtn();
+  AudioFX.reload && AudioFX.reload();    // 切换 clicky sfx
+});
+setTimeout(()=>_syncDifficultyBtn(), 1300);
 // r49 + r53: Daily login bonus + streak — 连续 N 天登录给 +N+1 credits 递进(上限 8)
 function _checkDailyLogin(){
   try{
