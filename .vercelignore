@@ -1,0 +1,36 @@
+# OS / Python / Node
+.DS_Store
+__pycache__/
+*.pyc
+node_modules/
+
+# Vercel / env / secrets
+.vercel/
+.env
+.env.*
+**/api-keys.env
+
+# Heavy raw assets (already composited / selected)
+assets/anim/leviathan-raw/
+assets/anim/leviathan-raw-v2/
+assets/portrait/
+assets/*.raw.png
+
+# Historical cutscene backups
+assets/cutscene/*.bak-r28
+
+# Pipeline internal state
+pipeline-state.json
+
+# Tooling caches
+.playwright-mcp/
+.next/
+
+# Generic backups
+*.bak
+*.backup
+
+# Vercel-only excludes (not deployed, kept in git)
+docs/
+*.md
+scripts/

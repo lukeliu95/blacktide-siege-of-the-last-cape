@@ -1,0 +1,123 @@
+{
+  "summary": "合并 4 维(audio/clarity/roar/render)为单文件 index.html 的 13 步串行实施方案。核心诉求(P0):枪声厚重(5层 shot)、BGM 加层(pad+LFO+慢sub+远景警报,且 stopBGM 同步清理新节点)、僵尸逼近惨叫(程序化 roar + 视觉前扑/红闪/震屏 + 远景偶发吼)、清晰度(僵尸描边/接触阴影/暖提亮 tint + 雾暗角雨减压)。P1 渲染精度(DPR 提分辨率 config、LINEAR 显式锁定、收紧命中盒)。P2 性能护栏(粒子上限/depth 缓存/雨自适应)。关键串行依赖:update() 僵尸循环第 480 行的 setScale 同时被 roar(脉冲守卫)与 render(depth 缓存)改动,必须一次性合并;spawn() 第 352 行 tint 同时被 clarity(暖 tint+FX)与 roar(z.roared/_pulsing 字段初始化)改动;tryFire() 第 389 行 tint 复位被 clarity 修 bug(clearTint→setTint(cfg.tint)),roar 的红闪复位需与之共存;startBGM 新增节点必须在 stopBGM 一并 stop;config 的 DPR zoom 与 render 的雨密度联动。所有改动落到唯一文件,按 P0→P1→P2 顺序应用,每步互不覆盖同一行两次(冲突行已合并为单步)。",
+  "steps": [
+    {
+      "n": 1,
+      "title": "厚重重机枪 shot():5 层合成(sub kick+body+crack+tail+机械)",
+      "target": "AudioFX IIFE — 在 noise() 之后(第 110 行后)新增 env()/burst() 两个闭包帮助函数;并替换 return 对象里的 shot()(第 140 行)",
+      "code": "// 【插入 A】在 noise() 函数之后、startBGM 之前(约第 110-111 行间)加入两个帮助函数:\n  function env(g,t,a,peak,dur,floor){ g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(peak,t+a); g.gain.exponentialRampToValueAtTime(floor||0.0008,t+dur); }\n  function burst(a,t,dur,peak,attack,hp,lp,q){ const n=Math.max(1,Math.floor(a.sampleRate*dur)); const buf=a.createBuffer(1,n,a.sampleRate),d=buf.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; const s=a.createBufferSource(); s.buffer=buf; const g=a.createGain(); env(g,t,attack,peak,dur); let node=s; if(hp){ const f=a.createBiquadFilter(); f.type='highpass'; f.frequency.value=hp; if(q)f.Q.value=q; node.connect(f); node=f; } if(lp){ const f2=a.createBiquadFilter(); f2.type='lowpass'; f2.frequency.value=lp; node.connect(f2); node=f2; } node.connect(g).connect(a.destination); s.start(t); s.stop(t+dur); }\n\n// 【替换 B】return 对象里的 shot()(第 140 行整行)替换为:\n    shot(){ const a=ensure(); if(!a)return; const t=a.currentTime; const J=()=>1+rnd(-0.05,0.05);\n      const k=a.createOscillator(),kg=a.createGain(); k.type='sine'; k.frequency.setValueAtTime(110*J(),t); k.frequency.exponentialRampToValueAtTime(45,t+0.06); env(kg,t,0.002,0.78,0.13); k.connect(kg).connect(a.destination); k.start(t); k.stop(t+0.14);\n      const k2=a.createOscillator(),k2g=a.createGain(); k2.type='triangle'; k2.frequency.setValueAtTime(78*J(),t); k2.frequency.exponentialRampToValueAtTime(46,t+0.05); env(k2g,t,0.002,0.30,0.09); k2.connect(k2g).connect(a.destination); k2.start(t); k2.stop(t+0.10);\n      const b=a.createOscillator(),bg=a.createGain(),bf=a.createBiquadFilter(); b.type='sawtooth'; b.frequency.setValueAtTime(190*J(),t); b.frequency.exponentialRampToValueAtTime(120,t+0.07); bf.type='bandpass'; bf.frequency.value=420; bf.Q.value=1.1; env(bg,t,0.003,0.28,0.08); b.connect(bf).connect(bg).connect(a.destination); b.start(t); b.stop(t+0.09);\n      const b2=a.createOscillator(),b2g=a.createGain(); b2.type='triangle'; b2.frequency.setValueAtTime(330*J(),t); b2.frequency.exponentialRampToValueAtTime(210,t+0.05); env(b2g,t,0.003,0.15,0.06); b2.connect(b2g).connect(a.destination); b2.start(t); b2.stop(t+0.07);\n      burst(a,t,0.004,0.50,0.0004,5500,16000,0.7);\n      burst(a,t+0.001,0.012,0.30,0.0006,1800,8000,0.6);\n      burst(a,t+0.012,0.12,0.13,0.006,160,900,0.4);\n      const m=a.createOscillator(),mg=a.createGain(); m.type='square'; m.frequency.setValueAtTime(2600*J(),t+0.018); env(mg,t+0.018,0.001,0.05,0.02); m.connect(mg).connect(a.destination); m.start(t+0.018); m.stop(t+0.045);\n      burst(a,t+0.02,0.01,0.06,0.0005,3000,9000,1.2);\n    },",
+      "replaces": "新增 env()/burst() 帮助函数;把单薄的单行 shot()(1中低square+1噪声+1高频click)替换为 5 层厚重合成。峰值较分析原值整体下调约 8%(0.85→0.78 等)给后续 BGM/roar 叠加留头空。",
+      "verify": "Playwright 启动 http 服务器(python3 -m http.server 4178)打开页面→点开始→按住开火;用 browser_evaluate 注入一个 AnalyserNode 抓 shot() 频谱,断言 60Hz 以下有明显能量(sub kick)且 5kHz 以上有 crack 峰;听感上从'啪'变'轰-哒'。控制台无报错。",
+      "priority": "P0"
+    },
+    {
+      "n": 2,
+      "title": "增强 startBGM():叠 pad+LFO+慢 sub 脉冲+远景警报",
+      "target": "AudioFX IIFE — 替换 startBGM(){...} 整个函数体(第 113-132 行)",
+      "code": "  function startBGM(){ const a=ensure(); if(!a||bgm)return;\n    const master=a.createGain(); master.gain.setValueAtTime(0.0001,a.currentTime); master.gain.linearRampToValueAtTime(0.50,a.currentTime+3); master.connect(a.destination);\n    const o1=a.createOscillator(),o2=a.createOscillator(),lp=a.createBiquadFilter(),dg=a.createGain(); o1.type='sawtooth'; o2.type='sawtooth'; o1.frequency.value=55; o2.frequency.value=55.5; lp.type='lowpass'; lp.frequency.value=210; dg.gain.value=0.15; o1.connect(lp); o2.connect(lp); lp.connect(dg); dg.connect(master); o1.start(); o2.start();\n    const padG=a.createGain(); padG.gain.value=0.0; padG.connect(master); padG.gain.linearRampToValueAtTime(0.085,a.currentTime+5);\n    const padFreqs=[110,130.81,164.81,220], padOscs=[]; padFreqs.forEach((f,i)=>{ const po=a.createOscillator(),pg=a.createGain(); po.type=i<2?'sawtooth':'triangle'; po.frequency.value=f*(1+(i?0.003:0)); pg.gain.value=[0.5,0.32,0.3,0.22][i]; po.connect(pg).connect(padG); po.start(); padOscs.push(po); });\n    const lfo=a.createOscillator(),lfoG=a.createGain(); lfo.type='sine'; lfo.frequency.value=0.12; lfoG.gain.value=0.025; lfo.connect(lfoG).connect(padG.gain); lfo.start();\n    const lfo2=a.createOscillator(),lfo2G=a.createGain(); lfo2.type='sine'; lfo2.frequency.value=5.5; lfo2G.gain.value=1.5; lfo2.connect(lfo2G); lfo2.connect(padOscs[0].frequency); lfo2.start();\n    const dur=4,n=a.sampleRate*dur,buf=a.createBuffer(1,n,a.sampleRate),d=buf.getChannelData(0); for(let i=0;i<n;i++)d[i]=(Math.random()*2-1); const ws=a.createBufferSource(); ws.buffer=buf; ws.loop=true; const wf=a.createBiquadFilter(); wf.type='bandpass'; wf.frequency.value=480; wf.Q.value=0.6; const wg=a.createGain(); wg.gain.value=0.04; ws.connect(wf).connect(wg).connect(master); ws.start();\n    bgm={master,o1,o2,ws,padOscs,lfo,lfo2}; beat=0;\n    bgmTimer=setInterval(()=>{ if(!bgm)return; const t=a.currentTime;\n      const k=a.createOscillator(),kg=a.createGain(); k.type='sine'; k.frequency.setValueAtTime(92,t); k.frequency.exponentialRampToValueAtTime(40,t+0.18); kg.gain.setValueAtTime(0.0001,t); kg.gain.linearRampToValueAtTime(0.48,t+0.01); kg.gain.exponentialRampToValueAtTime(0.0008,t+0.42); k.connect(kg).connect(bgm.master); k.start(t); k.stop(t+0.46); beat++;\n      if(beat%4===0){ const sub=a.createOscillator(),sg=a.createGain(); sub.type='sine'; sub.frequency.setValueAtTime(34,t); sub.frequency.exponentialRampToValueAtTime(26,t+1.2); sg.gain.setValueAtTime(0.0001,t); sg.gain.linearRampToValueAtTime(0.22,t+0.15); sg.gain.exponentialRampToValueAtTime(0.0006,t+1.6); sub.connect(sg).connect(bgm.master); sub.start(t); sub.stop(t+1.7); }\n      if(beat%8===0)noise(.7,.10,240);\n      if(Math.random()<0.12){ const al=a.createOscillator(),alg=a.createGain(),alf=a.createBiquadFilter(); al.type='sawtooth'; alf.type='lowpass'; alf.frequency.value=900; al.frequency.setValueAtTime(rnd(360,460),t); al.frequency.linearRampToValueAtTime(rnd(300,380),t+0.9); alg.gain.setValueAtTime(0.0001,t); alg.gain.linearRampToValueAtTime(0.05,t+0.4); alg.gain.exponentialRampToValueAtTime(0.0006,t+1.4); al.connect(alf).connect(alg).connect(bgm.master); al.start(t); al.stop(t+1.5); setTimeout(()=>noise(.18,.04,3200), rnd(200,600)); }\n    }, 1300);\n  }",
+      "replaces": "原 startBGM(仅 55Hz drone+风+战鼓+每8拍远炮)替换为多层:总线降 0.55→0.50;新增 A2 小三和弦 pad(0.12Hz 呼吸 LFO + 5.5Hz 颤音)、每4拍 30Hz 长尾 sub 脉冲、12% 概率远处防空警报+金属撞击。删除分析中未接线的 padLp 死代码。新增持续节点存入 bgm 对象供 stopBGM 清理(见第3步)。",
+      "verify": "Playwright 开始游戏后等 6s,browser_evaluate 抓 master 输出频谱:断言 110/164/220Hz 处有 pad 能量、0.12Hz 包络起伏可见;听感更厚更紧张。再点 Game Over/重开验证 BGM 不重叠(配合第3步)。",
+      "priority": "P0"
+    },
+    {
+      "n": 3,
+      "title": "stopBGM() 扩展:停掉 pad/lfo/lfo2 新增节点(防 BGM 停止后残响)",
+      "target": "AudioFX IIFE — stopBGM() 第 136 行的 setTimeout stop 回调",
+      "code": "// 把第 136 行:\n//   setTimeout(()=>{ try{nodes.o1.stop();nodes.o2.stop();nodes.ws.stop();}catch(e){} },700);\n// 替换为:\n    setTimeout(()=>{ try{ nodes.o1.stop(); nodes.o2.stop(); nodes.ws.stop(); nodes.lfo&&nodes.lfo.stop(); nodes.lfo2&&nodes.lfo2.stop(); (nodes.padOscs||[]).forEach(p=>{try{p.stop();}catch(e){}}); }catch(e){} },700);",
+      "replaces": "原 stopBGM 只 stop o1/o2/ws,会让第2步新增的 padOscs/lfo/lfo2 在 BGM 停止后仍持续发声。扩展为一并 stop,各自 try 包裹防止单个抛错中断其余。",
+      "verify": "Playwright:开始→等 5s 让 pad 起来→触发 Game Over→重开。browser_evaluate 抓总输出,断言 Game Over 后 pad 频段(110/164Hz)能量在 0.7s 内衰减到本底;不会出现两段 BGM 叠加变响。",
+      "priority": "P0"
+    },
+    {
+      "n": 4,
+      "title": "新增程序化惨叫 roar(type):基频上扬+颤动+气声+formant+过载",
+      "target": "AudioFX IIFE — 在 noise()/burst() 之后、return 之前新增 roar() 函数;并在 return 对象里加 'roar,' 引用(第 149 行 over 之前)",
+      "code": "// 【插入 A】在 burst() 之后、startBGM 之前加入:\n  function roar(type){ const a=ensure(); if(!a)return; const t=a.currentTime;\n    const P={ brute:{f0:58,dur:1.0,fmt:340,vibR:5.5,vibD:7,air:0.22,vol:0.34}, elite:{f0:82,dur:0.85,fmt:520,vibR:6,vibD:9,air:0.18,vol:0.30}, soldier:{f0:104,dur:0.72,fmt:680,vibR:6.5,vibD:11,air:0.16,vol:0.27}, runner:{f0:150,dur:0.62,fmt:920,vibR:8,vibD:16,air:0.20,vol:0.26} }[type] || {f0:104,dur:0.72,fmt:680,vibR:6.5,vibD:11,air:0.16,vol:0.27};\n    const {f0,dur,fmt,vibR,vibD,air,vol}=P;\n    const out=a.createGain(); out.gain.setValueAtTime(0.0001,t); out.gain.linearRampToValueAtTime(vol,t+0.06); out.gain.setValueAtTime(vol,t+dur*0.55); out.gain.exponentialRampToValueAtTime(0.0001,t+dur);\n    const sh=a.createWaveShaper(); { const k=12,nn=256,c=new Float32Array(nn); for(let i=0;i<nn;i++){const x=i*2/nn-1; c[i]=(1+k)*x/(1+k*Math.abs(x));} sh.curve=c; sh.oversample='2x'; } out.connect(sh); sh.connect(a.destination);\n    const o1=a.createOscillator(),o2=a.createOscillator(),og=a.createGain(); o1.type='sawtooth'; o2.type='sawtooth'; o1.frequency.setValueAtTime(f0,t); o1.frequency.linearRampToValueAtTime(f0*1.5,t+dur*0.7); o2.frequency.setValueAtTime(f0*1.01,t); o2.frequency.linearRampToValueAtTime(f0*1.5*1.01,t+dur*0.7); og.gain.value=0.9;\n    const lfo=a.createOscillator(),lg=a.createGain(); lfo.type='sine'; lfo.frequency.setValueAtTime(vibR,t); lfo.frequency.linearRampToValueAtTime(vibR*1.8,t+dur); lg.gain.setValueAtTime(vibD,t); lg.gain.linearRampToValueAtTime(vibD*2.2,t+dur); lfo.connect(lg); lg.connect(o1.frequency); lg.connect(o2.frequency); lfo.start(t); lfo.stop(t+dur);\n    const bp=a.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=4.5; bp.frequency.setValueAtTime(fmt*0.7,t); bp.frequency.linearRampToValueAtTime(fmt*1.4,t+dur*0.6); o1.connect(og); o2.connect(og); og.connect(bp); bp.connect(out); o1.start(t); o2.start(t); o1.stop(t+dur); o2.stop(t+dur);\n    const nN=Math.floor(a.sampleRate*dur),nb=a.createBuffer(1,nN,a.sampleRate),nd=nb.getChannelData(0); for(let i=0;i<nN;i++){const e=Math.min(1,i/(nN*0.08))*(1-i/nN); nd[i]=(Math.random()*2-1)*e;} const ns=a.createBufferSource(); ns.buffer=nb; const nf=a.createBiquadFilter(); nf.type='bandpass'; nf.Q.value=1.2; nf.frequency.setValueAtTime(fmt*1.2,t); nf.frequency.linearRampToValueAtTime(fmt*0.6,t+dur); const ng=a.createGain(); ng.gain.value=air; ns.connect(nf).connect(ng).connect(out); ns.start(t); ns.stop(t+dur);\n  }\n\n// 【修改 B】return 对象里(第 149 行 over 之前)加一行:\n    roar,",
+      "replaces": "AudioFX 新增 roar(type),按体型(brute 58Hz 低沉 / runner 150Hz 尖利)合成 0.6-1.0s 撕裂咆哮:双锯齿基频上扫+颤动 LFO+bandpass formant 喉腔共振+噪声气声层+waveShaper 轻度过载。复用同一 ac,无需新解锁。",
+      "verify": "Playwright browser_evaluate 直接调 game.scene.getScene('Battle') 取不到 AudioFX(闭包私有),改为间接验证:触发僵尸逼近(见第6步)听到撕裂吼;或临时把 AudioFX.roar 挂 window 调 roar('brute')/roar('runner') 对比 frequency 抓低/高频主峰差异。控制台无报错。",
+      "priority": "P0"
+    },
+    {
+      "n": 5,
+      "title": "spawn() 合并:暖色 tint + 分离 FX(描边/接触阴影)+ roar/pulse 字段初始化",
+      "target": "spawn() — 第 347-358 行;先改 TYPES tint(第 160-163 行);新增 addSeparationFX() 方法",
+      "code": "// 【改 TYPES tint(第 160-163 行)】把四处 tint:0xffffff 改为暖提亮:\n//   soldier/runner/elite → tint:0xfff2dc   brute → tint:0xffe8c4\n\n// 【改 spawn() 动画分支】第 348-349 行 spr 创建后补 tint(原动画分支没上 tint):\n//   spr=this.add.sprite(...).setOrigin(0.5,1); spr.play(...); spr.anims.setProgress(...); animated=true;\n//   →在该分支末尾加: spr.setTint(cfg.tint);\n\n// 【改 z 对象(第 354-355 行)】新增 roared/_pulsing/_sxNow/_syNow/shadow 字段:\n    const z={ spr, type, cfg, p:0, hp:cfg.hp, maxhp:cfg.hp, x0:x, step:rnd(0,6.28),\n              atkT:0, dead:false, emerge:1, animated, roared:false, _pulsing:false, _sxNow:1, _syNow:1, shadow:null };\n\n// 【在 this.zombies.push(z) 之前调用分离 FX】:\n    this.addSeparationFX(z, x);\n    spr.setData('z',z); this.zombies.push(z);\n\n// 【新增方法(放 class Battle 内, spawn 附近)】:\n  addSeparationFX(z, x){ const spr=z.spr;\n    if(spr.preFX){ spr.preFX.setPadding(8); spr.preFX.addGlow(0x05080a,4,0,false,0.10,6); z.fxGlow=spr.preFX.addGlow(0xffe9b0,2,0,true,0.06,4); }\n    z.shadow=this.add.ellipse(x, HORIZON_Y, 40, 12, 0x000000, 0.30).setDepth(9); }",
+      "replaces": "TYPES 四类 tint 从纯白改暖提亮(灰僵尸从冷蓝背景跳出);动画 sprite 分支补 setTint(原缺失);z 对象新增 roar/pulse 守卫字段与 shadow 引用(供第7步脉冲守卫、第6步红闪、第8步接触阴影同步);新增 addSeparationFX:WebGL 下 preFX 深色外描边+暖内描边,并统一建脚下椭圆接触阴影。合并了 clarity 的 tint/FX/shadow 与 roar 的字段初始化两处对 spawn 的改动。",
+      "verify": "Playwright 截图对比:僵尸轮廓出现深色+暖边、脚下有椭圆阴影、整体偏暖,从冷蓝海面明显分离。browser_evaluate 取一只 z 断言 z.shadow 存在、z.roared===false。type:Phaser.AUTO 多为 WebGL,preFX 生效;Canvas 回退仅阴影。",
+      "priority": "P0"
+    },
+    {
+      "n": 6,
+      "title": "update() 逼近吼叫触发:roar + 红闪 tint flash +(大体型)震屏",
+      "target": "update() 僵尸循环 — 第 480-482 行 setScale/setPosition 之后、第 484 行 if(z.p>=1) 之前插入",
+      "code": "// 在 z.spr.setScale(...).setPosition(...)...setAlpha(...) 这段之后插入:\n      const ROAR_AT=0.66;\n      if(!z.roared && z.p>=ROAR_AT){ z.roared=true;\n        this.roarBusy=(this.roarBusy||0);\n        if(this.roarBusy<2){ this.roarBusy++; AudioFX.roar(z.type); this.time.delayedCall(260,()=>{ this.roarBusy=Math.max(0,(this.roarBusy||1)-1); }); }\n        const sx=z._sxNow, sy=z._syNow;\n        this.tweens.add({ targets:z.spr, scaleX:sx*1.18, scaleY:sy*1.12, duration:120, yoyo:true, ease:'Quad.easeOut', onStart:()=>{ z._pulsing=true; }, onComplete:()=>{ z._pulsing=false; if(!z.dead) z.spr.setScale(z._sxNow,z._syNow); } });\n        if(!z.dead){ z.spr.setTintFill(0xb01616); this.time.delayedCall(140,()=>{ if(!z.dead) z.spr.setTint(z.cfg.tint); }); }\n        const big = z.cfg.nearH>=330; if(big) this.cameras.main.shake(z.type==='brute'?180:120, z.type==='brute'?0.010:0.006); }",
+      "replaces": "新增:僵尸 p 越过 0.66 阈值时触发一次性吼叫(z.roared 防重复)+ 张嘴前扑 scale 脉冲(受 z._pulsing 守卫,见第7步)+ 血红 tintFill 闪(140ms 后复位为 cfg.tint 而非 clearTint,与第5步暖 tint 一致)+ brute/elite 震屏。roarBusy 并发节流≤2(在 resetState 第10步清零)。红闪复位用 setTint(z.cfg.tint) 与 tryFire 命中白闪复位同源,互不冲突。",
+      "verify": "Playwright 开始游戏,放僵尸推进到屏幕 2/3 处:听到撕裂吼、看到僵尸猛地放大一下并泛血红、brute 上来时屏幕震;browser_evaluate 断言该 z.roared 变 true 且整段只触发一次(计数 roar 调用)。",
+      "priority": "P0"
+    },
+    {
+      "n": 7,
+      "title": "update() setScale 合并:脉冲守卫(_sxNow/_syNow)+ depth 缓存(性能)",
+      "target": "update() 僵尸循环 — 第 480-482 行 z.spr.setScale(base,base*squash).setPosition(...).setDepth(10+z.p*40)... 整段",
+      "code": "// 把第 480-482 行:\n//   z.spr.setScale(base, base*squash).setPosition(x,y).setAngle(rock*z.cfg.rock*am).setDepth(10+z.p*40).setAlpha(1 - z.emerge*0.85);\n// 替换为(记录基准缩放 + 脉冲期间跳过覆盖 + depth 仅跨档时 set):\n      z._sxNow=base; z._syNow=base*squash;\n      z.spr.setPosition(x,y).setAngle(rock*z.cfg.rock*am).setAlpha(1 - z.emerge*0.85);\n      if(!z._pulsing) z.spr.setScale(base, base*squash);\n      const newDepth=10+(z.p*40|0); if(z.spr.depth!==newDepth) z.spr.setDepth(newDepth);\n      if(z.shadow){ const sw=dispH*0.42, sa=lerp(0.12,0.40,Math.pow(z.p,1.3)); z.shadow.setPosition(x, y+2).setScale(sw/40,(sw*0.28)/12).setDepth(newDepth-0.5).setAlpha(sa*(1-z.emerge)); }",
+      "replaces": "第 480-482 行单行 setScale 链被合并重写,解决三方冲突:(1)roar 脉冲期间(_pulsing)跳过每帧 setScale 覆盖,否则脉冲被吃掉;(2)depth 改为仅跨整数档时 setDepth,避免每帧 display list 重排(render 性能);(3)第5步建的脚下 shadow 在此每帧同步位置/缩放/透明度/深度(接触阴影锚定主体)。这是全方案最关键的串行合并点。",
+      "verify": "Playwright:僵尸逼近时脉冲肉眼可见'弹'出(不被压平),阴影随距离变大变深贴脚;browser_evaluate 监控某 z.spr.depth 变化频率,断言不是每帧都变(仅跨档)。帧率稳定(配合第12步)。",
+      "priority": "P0"
+    },
+    {
+      "n": 8,
+      "title": "kill() 同步销毁 shadow(防孤儿椭圆)",
+      "target": "kill() — 第 403-404 行倒地淡出 tween 的 onComplete",
+      "code": "// 把第 403-404 行 tween 的 onComplete:\n//   onComplete:()=>{ z.spr.destroy(); this.zombies=this.zombies.filter(q=>q!==z); }\n// 替换为(一并销毁 shadow):\n      onComplete:()=>{ z.shadow&&z.shadow.destroy(); z.spr.destroy(); this.zombies=this.zombies.filter(q=>q!==z); }});\n// 同时在 kill() 开头(z.dead=true 之后)淡出阴影:\n//   z.shadow && this.tweens.add({targets:z.shadow,alpha:0,duration:420});",
+      "replaces": "第5步给每只僵尸建了 z.shadow 接触阴影,kill 倒地时必须销毁,否则留下孤儿椭圆。倒地阶段阴影淡出与尸体同步。",
+      "verify": "Playwright:连杀十几只后 browser_evaluate 统计场上 ellipse 对象数应等于存活僵尸数(无残留);视觉上尸体淡出阴影同步消失。",
+      "priority": "P0"
+    },
+    {
+      "n": 9,
+      "title": "远景偶发吼叫(节流)+ tryFire 命中复位 bug 修复",
+      "target": "create() 末尾闪电定时器旁(第 232 行后)新增 time 事件;tryFire() 第 389 行 clearTint 改 setTint",
+      "code": "// 【A:远景吼,在 create() 第 232 行闪电定时器之后插入】:\n    this.time.addEvent({ delay:2200, loop:true, callback:()=>{ if(this.state!=='play')return; const active=this.waveActive||this.zombies.length>0; if(!active)return; if(Math.random()<0.28){ if((this.roarBusy||0)<2){ this.roarBusy=(this.roarBusy||0)+1; const pool=['soldier','elite','brute']; AudioFX.roar(pool[(Math.random()*pool.length)|0]); this.time.delayedCall(260,()=>{ this.roarBusy=Math.max(0,(this.roarBusy||1)-1); }); } } }});\n\n// 【B:tryFire 命中白闪复位 bug,第 389 行】把:\n//   hit.spr.setTintFill(0xffffff); this.time.delayedCall(40,()=>{ if(!hit.dead)hit.spr.clearTint(); });\n// 改为(复位到暖 tint 而非清空,否则丢失第5步暖色):\n      hit.spr.setTintFill(0xffffff); this.time.delayedCall(40,()=>{ if(!hit.dead)hit.spr.setTint(hit.cfg.tint); });",
+      "replaces": "A:战斗中每 2.2s 以 28% 概率从'远处'传来低吼,营造群体压迫;空场/非战斗不触发;与近身吼共享 roarBusy≤2 节流。B:命中白闪复位由 clearTint 改 setTint(cfg.tint)——因第5步给僵尸上了暖 tint,clearTint 会把暖色抹成纯白,这是顺带修的 bug。",
+      "verify": "Playwright:战斗中静候可偶发听到远处低吼,空场(波次间隙无僵尸)不响。命中僵尸 40ms 后颜色复位为暖色而非纯白(截图对比命中前后色温一致)。",
+      "priority": "P0"
+    },
+    {
+      "n": 10,
+      "title": "resetState() 清零 roarBusy(防跨局残留)",
+      "target": "resetState() — 第 309 行 this.zombies 重置之后",
+      "code": "// 在第 309 行 this.zombies.forEach(...).zombies=[]; 之后加一行:\n    this.roarBusy=0;",
+      "replaces": "roarBusy 在第6/9步用于吼叫并发节流;重开游戏须清零,否则上一局遗留计数可能卡死新局的吼叫(一直≥2 不触发)。",
+      "verify": "Playwright:连续重开两局,第二局僵尸逼近仍能正常吼叫;browser_evaluate 断言开局后 scene.roarBusy===0。",
+      "priority": "P0"
+    },
+    {
+      "n": 11,
+      "title": "Phaser config 按 DPR 提分辨率 + LINEAR 锁定(Retina 变锐)",
+      "target": "new Phaser.Game({...}) — 第 525-531 行;create() 第 184 行 makeTextures() 之后",
+      "code": "// 【A:config 第 525-531 行】替换为:\nconst DPR = Math.min(window.devicePixelRatio||1, 2);\nconst game = new Phaser.Game({\n  type: Phaser.AUTO, parent:'game-container',\n  width: DW, height: DH, backgroundColor:'#05080a',\n  scale:{ mode:Phaser.Scale.FIT, autoCenter:Phaser.Scale.CENTER_BOTH, width:DW, height:DH, zoom:1/DPR },\n  render:{ antialias:true, antialiasGL:true, roundPixels:false, pixelArt:false, powerPreference:'high-performance', mipmapFilter:'LINEAR_MIPMAP_LINEAR', desynchronized:true },\n  scene: Battle\n});\n\n// 【B:create() 第 184 行 this.makeTextures() 之后】显式锁 LINEAR:\n    ['bg','z_soldier','z_runner','z_elite','z_brute','z_soldier_walk','gun_fp'].forEach(k=>{ if(this.textures.exists(k)) this.textures.get(k).setFilter(Phaser.Textures.FilterMode.LINEAR); });",
+      "replaces": "config 增加 zoom:1/DPR(backing store 在 Retina 提到 2560x1440,消整屏发虚)、powerPreference 强制独显、显式 pixelArt:false、mipmapFilter(大倍率降采样消远处僵尸闪烁)、desynchronized 降延迟。逻辑坐标仍 1280x720,准星/命中判定无需改。B 显式锁照片贴图 LINEAR 防回归。",
+      "verify": "Playwright 在 Retina 设备 browser_evaluate 读 game.canvas.width 应≈2560(DPR=2);截图对比 HUD 文字/准星/贴图边缘明显变锐。低端机如掉帧改 Math.min(...,1.5) 或走第13步降级。",
+      "priority": "P1"
+    },
+    {
+      "n": 12,
+      "title": "收紧命中盒(剔除透明 padding)+ 距准星 tiebreak",
+      "target": "tryFire() — 第 378-385 行命中判定循环",
+      "code": "// 把第 378-385 行命中遍历+爆头线:\n//   let hit=null; for(const z of this.zombies){...b.contains(px,py)...} ; const head=py<b.top+b.height*0.26;\n// 替换为:\n    const HITBOX={ x:0.30, y:0.06, w:0.40, h:0.92 };\n    let hit=null, hitScore=Infinity;\n    for(const z of this.zombies){ if(z.dead)continue; const b=z.spr.getBounds(); const hx=b.x+b.width*HITBOX.x, hw=b.width*HITBOX.w, hy=b.y+b.height*HITBOX.y, hh=b.height*HITBOX.h; if(px>=hx&&px<=hx+hw&&py>=hy&&py<=hy+hh){ const cx=hx+hw/2, dx=px-cx, dy=py-(hy+hh/2); const score=-z.p*1000+Math.hypot(dx,dy); if(score<hitScore){ hit=z; hitScore=score; } } }\n    if(hit){ const b=hit.spr.getBounds(); const hy=b.y+b.height*HITBOX.y, hh=b.height*HITBOX.h; const head = py < hy+hh*0.22; const dmg=head?2:1;\n      hit.hp-=dmg; AudioFX.hit(); this.bloods.emitParticleAt(px,py, head?16:9);\n      hit.spr.setTintFill(0xffffff); this.time.delayedCall(40,()=>{ if(!hit.dead)hit.spr.setTint(hit.cfg.tint); });\n      this.cameras.main.shake(50,0.003); if(head)this.floatText(px,py-10,'爆头!','#ffd24a'); if(hit.hp<=0)this.kill(hit,px,py); }",
+      "replaces": "原 getBounds().contains() 整张矩形粗判(含大量透明 padding 导致命中盒虚胖、爆头线偏高)替换为:人体框取贴图中部 40% 宽 / 纵向 6%-98%,爆头线基于收紧框顶 22%;重叠僵尸按 -p*1000+距准星距离 打分取最优。注意此处也已用 setTint(hit.cfg.tint) 复位(与第9步B 一致,避免两步重复改同行——本步整段重写已包含该修复,第9步B 与本步取其一应用即可,见 conflicts_note)。",
+      "verify": "Playwright 程序化点击僵尸贴图边缘空气区(应不命中)与人体中心(应命中);两只重叠时断言打中更近/更对准者;爆头线对齐头部。browser_evaluate 比对命中率。",
+      "priority": "P1"
+    },
+    {
+      "n": 13,
+      "title": "性能护栏:粒子上限 + 雨密度自适应 + 击杀爆发随负载衰减",
+      "target": "create() 第 200 行 bloods 定义、第 204 行 rain 定义;kill() 第 399 行",
+      "code": "// 【A:第 200 行 bloods】加 maxParticles:220:\n    this.bloods = this.add.particles(0,0,'spark',{ lifespan:600, speed:{min:60,max:280}, scale:{start:1.1,end:0}, alpha:{start:1,end:0}, tint:[0x7a1414,0xa01e1e,0x4a0c0c], gravityY:520, emitting:false, maxParticles:220 });\n\n// 【B:第 204 行 rain】quantity 按 DPR 降密度(DPR>1 时 4 否则 7):\n//   把 quantity:7 改为 quantity:(window.devicePixelRatio>1?4:7)\n\n// 【C:kill() 第 399 行】爆发量随存活数衰减:\n//   AudioFX.kill(); this.bloods.emitParticleAt(z.spr.x, y, z.type==='brute'?40:22);\n//   →\n      AudioFX.kill(); const load=this.zombies.length, burst0=(z.type==='brute'?40:22)*(load>18?0.5:1); this.bloods.emitParticleAt(z.spr.x, y, burst0);",
+      "replaces": "血粒子加 220 上限防高波次连杀堆积;雨在 Retina 提分辨率(第11步)后减半填充率;击杀血量在场上>18 只时减半。与第7步 depth 缓存共同保 60fps。纯护栏,不改玩法数值。",
+      "verify": "Playwright 跑到第 10 波(约 27 只)持续连杀,browser_evaluate 用 game.loop.actualFps 断言稳定≥55;雨在 DPR>1 时密度肉眼变稀但可接受;血量视觉仍足。",
+      "priority": "P2"
+    }
+  ],
+  "conflicts_note": "【最关键串行合并点 — update() 第 480-482 行 setScale 链】被三方同时改动,已合并为单独的第7步,绝不可拆开分别 apply:roar 维度要在脉冲期间(_pulsing)跳过每帧 setScale 覆盖、render 维度要把 setDepth 改成仅跨档调用、clarity 维度要在此每帧同步脚下 shadow。第6步(吼叫脉冲)依赖第7步引入的 z._pulsing/_sxNow/_syNow 守卫——必须先 apply 第5步(初始化这些字段)→ 第6步 → 第7步,顺序固定。\n\n【spawn() 第 352/354 行 — 第5步合并了 clarity+roar 两处】clarity 要改 tint 并加 FX/shadow,roar 要加 z.roared/_pulsing 字段。两者都动 z 对象字面量与 spawn 尾部,已在第5步一次性写完,后续步骤(6/7/8)只读这些字段不再改 spawn。\n\n【tint 复位三处必须统一为 setTint(cfg.tint),不能用 clearTint】因为第5步给僵尸上了暖 tint(0xfff2dc 等),任何 clearTint 都会把暖色抹成纯白:(a)tryFire 命中白闪复位(第9步B / 第12步整段重写,二选一)、(b)roar 红闪复位(第6步)。注意:第9步B 与第12步都改 tryFire 命中段——若两步都应用会冲突。决议:只应用第12步(它整段重写命中判定并已内含 setTint 复位);第9步只保留其 A 部分(远景吼定时器),其 B 部分(单独改第389行)在第12步存在时跳过。若决定不做第12步(P1 可延后),则改为应用第9步B 来修 tint bug。二者互斥,不可同时落。\n\n【startBGM/stopBGM 配对】第2步给 bgm 对象新增 padOscs/lfo/lfo2 持续节点,第3步必须配套扩展 stopBGM 的 stop 列表,否则 BGM 停止后 pad/颤音仍在响。两步绑定,缺一不可。删除分析里未接线的 padLp 死代码(第2步已删)。\n\n【roarBusy 生命周期】第6步(近身吼)、第9步A(远景吼)共享 this.roarBusy 计数节流(≤2 并发),第10步必须在 resetState 清零,否则跨局残留导致新局吼叫被永久卡死。三步绑定。\n\n【config DPR 与雨密度联动】第11步 zoom:1/DPR 把 Retina 填充率翻倍,第13步B 雨密度按 DPR>1 减半正是为抵消其性能开销;两步方向一致,建议同批落地。若仅做第11步不做第13步,低端 Retina 可能掉帧。\n\n【副作用/风险】(1)音频总能量:shot 5层+BGM 多振荡器+roar 同时叠加可能瞬时削波——已在第1步下调 shot 峰值约8%、第2步 BGM 总线 0.55→0.50 留头空;若实测仍削顶,后续可加 DynamicsCompressor 总线(threshold -10dB ratio 4),作为 P2 polish 不在本方案必做项。(2)preFX.addGlow 仅 WebGL 有效,type:Phaser.AUTO 多为 WebGL,Canvas 回退仅靠 shadow 椭圆,已兜底。(3)mipmap 需 WebGL2(贴图非 2 的幂),WebGL1 上 mipmapFilter 不生效退化为纯 LINEAR,远处仍可接受。(4)HITBOX 比例(第12步)需对照 4 种僵尸贴图实测微调,runner 前倾姿态可能要单独比例(可后续放进 TYPES)。(5)CLAUDE.md 仍写'像素射击'但实际已是照片贴图管线,render 维度的 LINEAR(非 pixelArt)判断与现状一致,无需改 config 的 antialias。\n\n【应用顺序总则】严格按 n=1..13 串行 apply,每步基于前一步结果。P0(1-10)优先全落;P1(11-12)其次,注意第12步与第9步B 互斥(见上);P2(13)最后做性能护栏。每步 apply 后用 Playwright 跑 http 服务器(file:// 被拦截)冒烟一次,确认控制台无报错再进下一步。"
+}

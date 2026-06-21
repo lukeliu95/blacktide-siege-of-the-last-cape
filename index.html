@@ -1,0 +1,1857 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>BLACKTIDE · Siege of the Last Cape</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Oswald:wght@300;400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+<style>
+  :root{
+    --display:"Black Ops One",system-ui,sans-serif;
+    --body:"Oswald",system-ui,sans-serif;
+    --gold:#d8b15a; --blood:#a01e1e; --ink:#e7e6df; --mut:#9aa3a0;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:#05080a;overflow:hidden;
+    font-family:var(--body);color:var(--ink);
+    -webkit-user-select:none;user-select:none;touch-action:none}
+  #game-container{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  canvas{cursor:none}
+  /* 电影叠层 */
+  #grain{position:fixed;inset:0;pointer-events:none;z-index:6;opacity:.06;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+  .overlay{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;text-align:center;
+    background:radial-gradient(ellipse at center,rgba(6,10,12,.66) 0%,rgba(4,6,8,.92) 100%);
+    backdrop-filter:blur(2px)}
+  .overlay.hidden{display:none}
+  /* 开场过场 CG 作标题动态背景 */
+  #title{background:transparent}
+  #introVid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+  #title .scrim{position:absolute;inset:0;z-index:1;
+    background:radial-gradient(ellipse at center,rgba(6,10,12,.42) 0%,rgba(4,6,8,.86) 100%)}
+  #title > .title,#title > .sub,#title > .lede,#title > .cta,#title > .controls{position:relative;z-index:2}
+  /* 关卡/最终胜利过场 */
+  #cutscene{background:transparent}
+  #cutsceneVid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+  #cutscene .scrim{position:absolute;inset:0;z-index:1;background:radial-gradient(ellipse at center,rgba(6,12,8,.40) 0%,rgba(4,8,6,.88) 100%)}
+  #cutscene > .title,#cutscene > .sub,#cutscene > .stat-line,#cutscene > .cta{position:relative;z-index:2}
+  #cutscene .title .accent{color:var(--gold)}
+  /* 章节预告卡 */
+  #chapter{background:linear-gradient(180deg,rgba(4,8,10,.92) 0%,rgba(6,12,16,.96) 100%)}
+  #chapter > .sub,#chapter > .title{position:relative;z-index:2;text-align:center}
+  #chapTitle{font-family:var(--display);color:var(--ink);text-shadow:0 3px 18px rgba(0,0,0,.85)}
+  /* r28 Pick B: 章节引言电影板 */
+  #epigraph{background:radial-gradient(ellipse at center,rgba(4,8,10,.78) 0%,rgba(2,4,6,.97) 100%);opacity:0;transition:opacity 480ms ease-out;pointer-events:none}
+  #epigraph.show{opacity:1;pointer-events:auto}
+  #epigraph.brief{transition:opacity 320ms ease-out}
+  #epigraph .epi-frame{display:flex;flex-direction:column;align-items:center;justify-content:center;transform:scale(.96);transition:transform 480ms cubic-bezier(.22,1,.36,1);max-width:780px;padding:0 36px;text-align:center}
+  #epigraph.brief .epi-frame{transition:transform 320ms cubic-bezier(.22,1,.36,1)}
+  #epigraph.show .epi-frame{transform:scale(1)}
+  #epiRoman{font-family:var(--display);color:var(--gold);font-size:clamp(60px,12vw,140px);line-height:1;letter-spacing:6px;padding-left:6px;text-shadow:0 6px 32px rgba(0,0,0,.9),0 0 18px rgba(216,177,90,.18)}
+  #epiSub{font-family:var(--body);font-weight:300;color:var(--ink);font-size:18px;letter-spacing:8px;text-transform:uppercase;margin-top:22px;opacity:.92}
+  #epiRule{width:120px;height:1px;background:linear-gradient(90deg,transparent,rgba(216,177,90,.55),transparent);margin:26px auto 22px}
+  #epigraph.brief #epiRule,#epigraph.brief #epiLede,#epigraph.brief #epiStamp{display:none}
+  #epiLede{font-family:'Courier New',monospace;color:#c3c8c4;font-size:14px;line-height:1.7;letter-spacing:.5px;max-width:620px}
+  #epiLede::before{content:'— Field Log · ';color:#d8b15a;font-weight:700}
+  #epiStamp{position:absolute;bottom:6vh;left:50%;transform:translateX(-50%);font-family:var(--body);font-weight:300;color:#6a6e72;font-size:11px;letter-spacing:6px;border:1px solid rgba(106,110,114,.45);padding:5px 14px;border-radius:1px;opacity:.78}
+  /* 暂停菜单 */
+  #pause{background:transparent}
+  #pause .scrim{position:absolute;inset:0;z-index:1;background:radial-gradient(ellipse at center,rgba(6,10,12,.78) 0%,rgba(4,6,8,.94) 100%);backdrop-filter:blur(4px)}
+  #pause > .title,#pause > .sub,#pause > div{position:relative;z-index:2}
+  .title{font-family:var(--display);color:var(--ink);letter-spacing:2px;
+    font-size:clamp(34px,6vw,76px);text-shadow:0 3px 18px rgba(0,0,0,.85);line-height:1}
+  .title .accent{color:var(--blood)}
+  .sub{font-family:var(--body);font-weight:300;color:var(--mut);
+    font-size:clamp(13px,1.6vw,18px);letter-spacing:6px;text-transform:uppercase;margin-top:14px}
+  .lede{font-family:var(--body);font-weight:300;color:#c3c8c4;max-width:620px;
+    font-size:clamp(13px,1.5vw,16px);line-height:1.7;margin-top:26px;padding:0 24px}
+  .cta{font-family:var(--display);margin-top:38px;font-size:clamp(16px,2vw,22px);
+    letter-spacing:2px;color:#0a0d0e;background:var(--gold);border:none;cursor:pointer;
+    padding:16px 44px;border-radius:3px;box-shadow:0 6px 16px rgba(0,0,0,.45);
+    transition:transform .12s,filter .12s}
+  .cta:hover{transform:translateY(-2px);filter:brightness(1.08)}
+  .controls{margin-top:30px;font-family:var(--body);font-weight:300;color:var(--mut);
+    font-size:13px;letter-spacing:3px;text-transform:uppercase}
+  .controls b{color:var(--gold);font-weight:600}
+  .stat-line{font-family:var(--body);color:#c3c8c4;font-size:clamp(15px,2vw,20px);margin-top:8px;letter-spacing:1px}
+  .stat-line .big{font-family:var(--display);color:var(--gold);font-size:clamp(30px,5vw,56px)}
+  .rec{position:fixed;top:14px;left:16px;z-index:11;font-family:var(--body);font-weight:300;
+    color:#c64b3a;font-size:12px;letter-spacing:3px;display:flex;align-items:center;gap:7px;pointer-events:none;opacity:.85}
+  .rec .dot{width:9px;height:9px;border-radius:50%;background:#c64b3a;animation:blink 1.2s steps(2) infinite}
+  @keyframes blink{50%{opacity:.2}}
+</style>
+</head>
+<body>
+<div id="game-container"></div>
+<div id="grain"></div>
+<div class="rec" id="rec"><span class="dot"></span> BLACKTIDE · CYCLE 9</div>
+
+<div class="overlay" id="title">
+  <video id="introVid" autoplay muted loop playsinline poster="assets/intro-poster.jpg">
+    <source src="assets/intro.mp4" type="video/mp4">
+  </video>
+  <div class="scrim"></div>
+  <div class="title">BLACKTIDE<span class="accent"> · Siege of the Last Cape</span></div>
+  <div class="sub">Cycle 9 Begins · Marshal Eisen's Stand</div>
+  <div class="lede">Every hundred years the cursed sea rises and the drowned come back to take the shore.
+    You are Marshal Eisen, commander of the world's last bastion. Hold the trigger. Survive ten waves. Hold the Cape.</div>
+  <button class="cta" id="startBtn">▶ Enter the Battlefield</button>
+  <div class="controls"><b>Mouse</b> Aim · <b>Hold LMB</b> Fire · <b>1-4</b> Switch Weapon · <b>R</b> Reload · <b>P</b> Pause</div>
+</div>
+
+<div class="overlay hidden" id="over">
+  <div class="title"><span class="accent">Line Overrun</span></div>
+  <div class="sub" id="overSub">They reached the wall</div>
+  <div class="stat-line">Held to Wave <span class="big" id="overWave">1</span> · Kills <span class="big" id="overKills">0</span></div>
+  <div class="stat-line">Score <span class="big" id="overScore">0</span></div>
+  <div class="stat-line" id="overBest" style="font-weight:300;color:#9aa3a0;font-size:15px"></div>
+  <div style="display:flex;gap:14px;margin-top:18px;flex-wrap:wrap;justify-content:center">
+    <button class="cta" id="retrySectorBtn" style="background:#a01e1e;color:#fff4cc">↻ RESTART SECTOR <span id="overLevel">1</span></button>
+    <button class="cta" id="retryBtn">↻ Restart Cycle 9</button>
+  </div>
+</div>
+
+<audio id="battleBgm" src="assets/bgm/battle-theme.mp3" loop preload="auto"></audio>
+<audio id="titleBgm" src="assets/bgm/title-theme.mp3" loop preload="auto"></audio>
+<audio id="victoryBgm" src="assets/bgm/victory-theme.mp3" loop preload="auto"></audio>
+<audio id="bossBgm" src="assets/bgm/boss-theme.mp3" loop preload="auto"></audio>
+
+<div class="overlay hidden" id="cutscene">
+  <video id="cutsceneVid" muted playsinline></video>
+  <div class="scrim"></div>
+  <div class="title" id="cutTitle">Sector Secured</div>
+  <div class="sub" id="cutSubLabel">SECTOR SECURED</div>
+  <div class="stat-line" id="cutSub" style="margin-top:18px"></div>
+  <button class="cta" id="cutBtn" style="display:none">↻ Fight Again</button>
+</div>
+
+<div class="overlay hidden" id="chapter">
+  <div class="scrim"></div>
+  <div class="sub" id="chapNum" style="color:#9aa3a0;letter-spacing:8px">CHAPTER</div>
+  <div class="title" id="chapTitle" style="font-size:clamp(28px,5vw,56px);margin-top:8px"></div>
+  <div class="sub" id="chapSub" style="color:#d8b15a;margin-top:14px"></div>
+</div>
+
+<!-- r28 Pick B: 章节引言电影板 -->
+<div class="overlay hidden" id="epigraph">
+  <div class="epi-frame">
+    <div id="epiRoman">I</div>
+    <div id="epiSub">THE FIRST TOLL</div>
+    <div id="epiRule"></div>
+    <div id="epiLede"></div>
+  </div>
+  <div id="epiStamp">BLACKTIDE · CYCLE 9</div>
+</div>
+
+<div class="overlay hidden" id="pause">
+  <div class="scrim"></div>
+  <div class="title" style="font-size:clamp(36px,5vw,64px)">PAUSED</div>
+  <div class="sub" style="color:#9aa3a0;margin-top:6px">CYCLE 9 SUSPENDED</div>
+  <div style="display:flex;flex-direction:column;gap:14px;margin-top:36px;align-items:center">
+    <button class="cta" id="resumeBtn" style="min-width:240px">▶ RESUME</button>
+    <button class="cta" id="pauseRetrySectorBtn" style="min-width:240px;background:#a01e1e;color:#fff4cc">↻ RESTART SECTOR <span id="pauseLevel">1</span></button>
+    <button class="cta" id="quitBtn" style="min-width:240px;background:#3a3a30;color:#c3c8c4">✕ QUIT TO TITLE</button>
+  </div>
+  <div style="margin-top:36px;padding:14px 22px;background:rgba(8,12,14,.55);border:1px solid rgba(216,177,90,.3);border-radius:3px;display:flex;flex-direction:column;gap:10px;min-width:300px">
+    <div style="font-family:Oswald,sans-serif;font-size:10px;letter-spacing:4px;color:#d8b15a;text-align:center">SETTINGS</div>
+    <div style="display:flex;align-items:center;gap:12px;font-family:Oswald,sans-serif;font-size:13px;color:#c3c8c4">
+      <button id="muteBtn" style="background:#3a3a30;color:#fff4cc;border:1px solid #6a6a60;padding:4px 12px;cursor:pointer;font-family:inherit;font-size:11px;letter-spacing:2px">🔊 SOUND</button>
+      <span style="min-width:48px;text-align:right">VOLUME</span>
+      <input type="range" id="masterVol" min="0" max="100" value="100" style="flex:1;accent-color:#d8b15a">
+      <span id="masterVolTxt" style="min-width:40px;text-align:right;color:#fff4cc">100%</span>
+    </div>
+  </div>
+</div>
+
+<div id="eisenWrap" style="position:fixed;left:50%;bottom:11vh;transform:translateX(-50%);z-index:8;
+  pointer-events:none;opacity:0;transition:opacity .35s ease;max-width:80vw;
+  background:linear-gradient(180deg,rgba(8,12,14,.85),rgba(8,12,14,.78));
+  border:1px solid #d8b15a;border-left:4px solid #d8b15a;border-right:4px solid #d8b15a;
+  box-shadow:0 4px 24px rgba(0,0,0,.6),inset 0 0 0 1px rgba(216,177,90,.18);
+  padding:6px 22px 12px;min-width:380px;text-align:left;display:flex;align-items:stretch;gap:14px">
+  <!-- r30: Marshal Eisen portrait(96x120 thumbnail · 字幕电报区左侧 · BLACKTIDE 古代石堡指挥官) -->
+  <img id="eisenPortrait" src="assets/eisen-portrait.png" alt="Marshal Eisen"
+       style="flex:0 0 auto;width:84px;height:auto;align-self:center;display:block;
+              filter:drop-shadow(0 2px 6px rgba(0,0,0,.7)) contrast(1.08);
+              border-right:1px solid rgba(216,177,90,.3);padding-right:12px;
+              transition:filter .25s ease, transform .25s ease;transform-origin:center"
+       onerror="this.style.display='none'">
+  <div style="display:flex;flex-direction:column;justify-content:center;flex:1;min-width:0">
+    <div style="display:flex;align-items:center;gap:8px;font-family:'Oswald',sans-serif;font-size:10px;color:#d8b15a;letter-spacing:5px;border-bottom:1px solid rgba(216,177,90,.35);padding-bottom:5px;margin-bottom:8px;text-transform:uppercase">
+      <span id="eisenDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#c64b3a;animation:blink 1s steps(2) infinite"></span>
+      <span>INCOMING · MARSHAL EISEN · CYCLE 9</span>
+    </div>
+    <div id="eisenLine" style="font-family:'Courier New',monospace;font-weight:700;color:#fff4cc;
+      font-size:clamp(14px,1.7vw,20px);letter-spacing:2px;line-height:1.4;min-height:1.4em;
+      text-shadow:0 1px 6px rgba(0,0,0,.85)"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+   诺曼底防线:亡兵浪潮 — Phaser 3 · 电影级真实感波次射击
+   真实滩头背景 + 真人级僵尸贴图 + 透视逼近 + 正面火力
+   ============================================================================ */
+const DW = 1280, DH = 720;
+
+/* ---------- 程序化音效(WebAudio) ---------- */
+const AudioFX = (() => {
+  let ac = null, _masterLP = null, _masterGain = null, _reverb = null, _reverbGain = null;
+  const ensure = () => { if (!ac) { try { ac = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){} } if (ac && ac.state==='suspended') ac.resume(); return ac; };
+  // 主总线:所有 SFX 经 lowpass(默认 20kHz=透明)+ master gain → destination
+  // 慢镜时 lowpass→600Hz + master gain 微衰 = "水下/聚焦"声场
+  const bus = (a) => {
+    if(!_masterLP){
+      _masterLP = a.createBiquadFilter(); _masterLP.type='lowpass'; _masterLP.frequency.value=20000;
+      _masterGain = a.createGain(); _masterGain.gain.value=1.0;
+      _masterLP.connect(_masterGain).connect(a.destination);
+      // 程序化 IR 卷积混响(海滩远景空间感:1.8s 衰减噪声)
+      const irLen=Math.floor(a.sampleRate*1.8), irBuf=a.createBuffer(2,irLen,a.sampleRate);
+      for(let ch=0;ch<2;ch++){ const d=irBuf.getChannelData(ch);
+        for(let i=0;i<irLen;i++){ const t=i/irLen; d[i]=(Math.random()*2-1)*Math.pow(1-t,2.2)*0.55; } }
+      _reverb=a.createConvolver(); _reverb.buffer=irBuf;
+      _reverbGain=a.createGain(); _reverbGain.gain.value=0.18;                   // 默认湿度 18%
+      _masterLP.connect(_reverb); _reverb.connect(_reverbGain).connect(_masterGain);
+    }
+    return _masterLP;
+  };
+  // r28: perspective-aware stereo panning — DW_REF is the world width used to map x → pan
+  let DW_REF = 1280;
+  function setWorldWidth(w){ if(w>0) DW_REF = w; }
+  // panTo(a, x): when x is a finite number, insert a StereoPannerNode between caller and bus(a);
+  // when x is undefined/null/NaN, return bus(a) directly so legacy call chains stay byte-identical.
+  function panTo(a, x){
+    const b = bus(a);
+    if(x==null || !isFinite(x) || typeof a.createStereoPanner!=='function') return b;
+    const half = DW_REF/2;
+    let p = (x - half) / half; if(p<-0.85)p=-0.85; else if(p>0.85)p=0.85;
+    const sp = a.createStereoPanner(); sp.pan.value = p; sp.connect(b);
+    return sp;
+  }
+  // BGM crossfade helper(平滑切换)
+  function bgmCrossfade(fromEl, toEl, fromVol, toVol, ms){
+    fromVol = fromVol==null ? (fromEl?fromEl.volume:0.55) : fromVol;
+    toVol   = toVol   ==null ? 0.55 : toVol;
+    ms      = ms      ==null ? 500  : ms;
+    const steps=Math.max(6,Math.floor(ms/40));
+    if(toEl){ toEl.volume=0; toEl.currentTime=0; toEl.play().catch(()=>{}); }
+    let i=0; const iv=setInterval(()=>{
+      i++; const k=i/steps;
+      if(fromEl) fromEl.volume = Math.max(0, fromVol*(1-k));
+      if(toEl)   toEl.volume   = Math.min(1, toVol*k);
+      if(i>=steps){ clearInterval(iv); if(fromEl){fromEl.pause(); fromEl.volume=fromVol;} }
+    }, ms/steps);
+  }
+  // Cinematic dive(慢镜专用):lowpass 砍到 600Hz + BGM duck
+  function diveIn(){ const a=ensure(); if(!a)return; bus(a);
+    const t=a.currentTime;
+    _masterLP.frequency.cancelScheduledValues(t);
+    _masterLP.frequency.setValueAtTime(_masterLP.frequency.value,t);
+    _masterLP.frequency.exponentialRampToValueAtTime(620, t+0.25);
+    _masterGain.gain.cancelScheduledValues(t); _masterGain.gain.linearRampToValueAtTime(0.65, t+0.25);
+    // BGM duck
+    const bb=document.getElementById('battleBgm'), boss=document.getElementById('bossBgm');
+    [bb,boss].forEach(el=>{ if(el && !el.paused) el._dukVol=el.volume; });
+    [bb,boss].forEach(el=>{ if(el && !el.paused) el.volume=Math.max(0.12, el.volume*0.30); });
+    // 入场 whoosh(下行噪声扫频)
+    noise(0.55,0.20,1200);
+    tone(220,0.4,'sine',0.18,55);
+  }
+  function diveOut(){ const a=ensure(); if(!a)return; bus(a);
+    const t=a.currentTime;
+    _masterLP.frequency.cancelScheduledValues(t);
+    _masterLP.frequency.setValueAtTime(_masterLP.frequency.value,t);
+    _masterLP.frequency.exponentialRampToValueAtTime(20000, t+0.4);
+    _masterGain.gain.cancelScheduledValues(t); _masterGain.gain.linearRampToValueAtTime(1.0, t+0.4);
+    const bb=document.getElementById('battleBgm'), boss=document.getElementById('bossBgm');
+    [bb,boss].forEach(el=>{ if(el && el._dukVol!=null){ el.volume=el._dukVol; el._dukVol=null; } });
+  }
+  function tone(f,dur,type,vol,slideTo){ const a=ensure(); if(!a)return;
+    const o=a.createOscillator(),g=a.createGain(); o.type=type||'square';
+    o.frequency.setValueAtTime(f,a.currentTime);
+    if(slideTo)o.frequency.exponentialRampToValueAtTime(Math.max(40,slideTo),a.currentTime+dur);
+    g.gain.setValueAtTime(vol||.08,a.currentTime); g.gain.exponentialRampToValueAtTime(.0001,a.currentTime+dur);
+    o.connect(g).connect(bus(a)); o.start(); o.stop(a.currentTime+dur); }
+  function noise(dur,vol,lp){ const a=ensure(); if(!a)return;
+    const n=Math.floor(a.sampleRate*dur),buf=a.createBuffer(1,n,a.sampleRate),d=buf.getChannelData(0);
+    for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
+    const s=a.createBufferSource(),g=a.createGain(),f=a.createBiquadFilter();
+    s.buffer=buf; f.type='lowpass'; f.frequency.value=lp||2200; g.gain.value=vol||.12;
+    s.connect(f).connect(g).connect(bus(a)); s.start(); }
+  // ---- 厚重枪声/吼叫帮助:AD 包络 + 带包络滤波噪声爆 ----
+  function env(g,t,a,peak,dur,floor){ g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(peak,t+a); g.gain.exponentialRampToValueAtTime(floor||0.0008,t+dur); }
+  function burst(a,t,dur,peak,attack,hp,lp,q){ const n=Math.max(1,Math.floor(a.sampleRate*dur)); const buf=a.createBuffer(1,n,a.sampleRate),d=buf.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; const s=a.createBufferSource(); s.buffer=buf; const g=a.createGain(); env(g,t,attack,peak,dur); let node=s; if(hp){ const f=a.createBiquadFilter(); f.type='highpass'; f.frequency.value=hp; if(q)f.Q.value=q; node.connect(f); node=f; } if(lp){ const f2=a.createBiquadFilter(); f2.type='lowpass'; f2.frequency.value=lp; node.connect(f2); node=f2; } node.connect(g).connect(bus(a)); s.start(t); s.stop(t+dur); }
+  // r28: same as burst but caller-supplied sink (lets a single panner be shared across multiple bursts in one SFX)
+  function _burstTo(a,t,dur,peak,attack,hp,lp,q,sink){ const n=Math.max(1,Math.floor(a.sampleRate*dur)); const buf=a.createBuffer(1,n,a.sampleRate),d=buf.getChannelData(0); for(let i=0;i<n;i++) d[i]=Math.random()*2-1; const s=a.createBufferSource(); s.buffer=buf; const g=a.createGain(); env(g,t,attack,peak,dur); let node=s; if(hp){ const f=a.createBiquadFilter(); f.type='highpass'; f.frequency.value=hp; if(q)f.Q.value=q; node.connect(f); node=f; } if(lp){ const f2=a.createBiquadFilter(); f2.type='lowpass'; f2.frequency.value=lp; node.connect(f2); node=f2; } node.connect(g).connect(sink||bus(a)); s.start(t); s.stop(t+dur); }
+  // ---- 程序化惨叫 roar(按体型音高):基频上扬+颤动+formant+气声+轻过载 ----
+  function roar(type, x){ const a=ensure(); if(!a)return; const t=a.currentTime;
+    const P={ brute:{f0:58,dur:1.0,fmt:340,vibR:5.5,vibD:7,air:0.22,vol:0.34}, elite:{f0:82,dur:0.85,fmt:520,vibR:6,vibD:9,air:0.18,vol:0.30}, soldier:{f0:104,dur:0.72,fmt:680,vibR:6.5,vibD:11,air:0.16,vol:0.27}, runner:{f0:150,dur:0.62,fmt:920,vibR:8,vibD:16,air:0.20,vol:0.26} }[type] || {f0:104,dur:0.72,fmt:680,vibR:6.5,vibD:11,air:0.16,vol:0.27};
+    const {f0,dur,fmt,vibR,vibD,air,vol}=P;
+    const _sink=panTo(a,x);
+    const out=a.createGain(); out.gain.setValueAtTime(0.0001,t); out.gain.linearRampToValueAtTime(vol,t+0.06); out.gain.setValueAtTime(vol,t+dur*0.55); out.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    const sh=a.createWaveShaper(); { const k=12,nn=256,c=new Float32Array(nn); for(let i=0;i<nn;i++){const xv=i*2/nn-1; c[i]=(1+k)*xv/(1+k*Math.abs(xv));} sh.curve=c; sh.oversample='2x'; } out.connect(sh); sh.connect(_sink);
+    const o1=a.createOscillator(),o2=a.createOscillator(),og=a.createGain(); o1.type='sawtooth'; o2.type='sawtooth'; o1.frequency.setValueAtTime(f0,t); o1.frequency.linearRampToValueAtTime(f0*1.5,t+dur*0.7); o2.frequency.setValueAtTime(f0*1.01,t); o2.frequency.linearRampToValueAtTime(f0*1.5*1.01,t+dur*0.7); og.gain.value=0.9;
+    const lfo=a.createOscillator(),lg=a.createGain(); lfo.type='sine'; lfo.frequency.setValueAtTime(vibR,t); lfo.frequency.linearRampToValueAtTime(vibR*1.8,t+dur); lg.gain.setValueAtTime(vibD,t); lg.gain.linearRampToValueAtTime(vibD*2.2,t+dur); lfo.connect(lg); lg.connect(o1.frequency); lg.connect(o2.frequency); lfo.start(t); lfo.stop(t+dur);
+    const bp=a.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=4.5; bp.frequency.setValueAtTime(fmt*0.7,t); bp.frequency.linearRampToValueAtTime(fmt*1.4,t+dur*0.6); o1.connect(og); o2.connect(og); og.connect(bp); bp.connect(out); o1.start(t); o2.start(t); o1.stop(t+dur); o2.stop(t+dur);
+    const nN=Math.floor(a.sampleRate*dur),nb=a.createBuffer(1,nN,a.sampleRate),nd=nb.getChannelData(0); for(let i=0;i<nN;i++){const e=Math.min(1,i/(nN*0.08))*(1-i/nN); nd[i]=(Math.random()*2-1)*e;} const ns=a.createBufferSource(); ns.buffer=nb; const nf=a.createBiquadFilter(); nf.type='bandpass'; nf.Q.value=1.2; nf.frequency.setValueAtTime(fmt*1.2,t); nf.frequency.linearRampToValueAtTime(fmt*0.6,t+dur); const ng=a.createGain(); ng.gain.value=air; ns.connect(nf).connect(ng).connect(out); ns.start(t); ns.stop(t+dur); }
+  // ---- 程序化电影氛围 BGM(低频 drone + 风声 + 慢战鼓 + 远炮)----
+  let bgm=null, bgmTimer=null, beat=0;
+  function startBGM(){ const a=ensure(); if(!a||bgm)return;
+    const master=a.createGain(); master.gain.setValueAtTime(0.0001,a.currentTime); master.gain.linearRampToValueAtTime(0.50,a.currentTime+3); master.connect(bus(a));
+    const o1=a.createOscillator(),o2=a.createOscillator(),lp=a.createBiquadFilter(),dg=a.createGain(); o1.type='sawtooth'; o2.type='sawtooth'; o1.frequency.value=55; o2.frequency.value=55.5; lp.type='lowpass'; lp.frequency.value=210; dg.gain.value=0.15; o1.connect(lp); o2.connect(lp); lp.connect(dg); dg.connect(master); o1.start(); o2.start();
+    const padG=a.createGain(); padG.gain.value=0.0; padG.connect(master); padG.gain.linearRampToValueAtTime(0.085,a.currentTime+5);
+    const padFreqs=[110,130.81,164.81,220], padOscs=[]; padFreqs.forEach((f,i)=>{ const po=a.createOscillator(),pg=a.createGain(); po.type=i<2?'sawtooth':'triangle'; po.frequency.value=f*(1+(i?0.003:0)); pg.gain.value=[0.5,0.32,0.3,0.22][i]; po.connect(pg).connect(padG); po.start(); padOscs.push(po); });
+    const lfo=a.createOscillator(),lfoG=a.createGain(); lfo.type='sine'; lfo.frequency.value=0.12; lfoG.gain.value=0.025; lfo.connect(lfoG).connect(padG.gain); lfo.start();
+    const lfo2=a.createOscillator(),lfo2G=a.createGain(); lfo2.type='sine'; lfo2.frequency.value=5.5; lfo2G.gain.value=1.5; lfo2.connect(lfo2G); lfo2.connect(padOscs[0].frequency); lfo2.start();
+    const dur=4,n=a.sampleRate*dur,buf=a.createBuffer(1,n,a.sampleRate),d=buf.getChannelData(0); for(let i=0;i<n;i++)d[i]=(Math.random()*2-1); const ws=a.createBufferSource(); ws.buffer=buf; ws.loop=true; const wf=a.createBiquadFilter(); wf.type='bandpass'; wf.frequency.value=480; wf.Q.value=0.6; const wg=a.createGain(); wg.gain.value=0.04; ws.connect(wf).connect(wg).connect(master); ws.start();
+    bgm={master,o1,o2,ws,padOscs,lfo,lfo2}; beat=0;
+    bgmTimer=setInterval(()=>{ if(!bgm)return; const t=a.currentTime;
+      const k=a.createOscillator(),kg=a.createGain(); k.type='sine'; k.frequency.setValueAtTime(92,t); k.frequency.exponentialRampToValueAtTime(40,t+0.18); kg.gain.setValueAtTime(0.0001,t); kg.gain.linearRampToValueAtTime(0.48,t+0.01); kg.gain.exponentialRampToValueAtTime(0.0008,t+0.42); k.connect(kg).connect(bgm.master); k.start(t); k.stop(t+0.46); beat++;
+      if(beat%4===0){ const sub=a.createOscillator(),sg=a.createGain(); sub.type='sine'; sub.frequency.setValueAtTime(34,t); sub.frequency.exponentialRampToValueAtTime(26,t+1.2); sg.gain.setValueAtTime(0.0001,t); sg.gain.linearRampToValueAtTime(0.22,t+0.15); sg.gain.exponentialRampToValueAtTime(0.0006,t+1.6); sub.connect(sg).connect(bgm.master); sub.start(t); sub.stop(t+1.7); }
+      if(beat%8===0)noise(.7,.10,240);
+      if(Math.random()<0.12){ const al=a.createOscillator(),alg=a.createGain(),alf=a.createBiquadFilter(); al.type='sawtooth'; alf.type='lowpass'; alf.frequency.value=900; al.frequency.setValueAtTime(rnd(360,460),t); al.frequency.linearRampToValueAtTime(rnd(300,380),t+0.9); alg.gain.setValueAtTime(0.0001,t); alg.gain.linearRampToValueAtTime(0.05,t+0.4); alg.gain.exponentialRampToValueAtTime(0.0006,t+1.4); al.connect(alf).connect(alg).connect(bgm.master); al.start(t); al.stop(t+1.5); setTimeout(()=>noise(.18,.04,3200), rnd(200,600)); }
+    }, 1300);
+  }
+  function stopBGM(){ if(!bgm)return; const a=ensure(); const nodes=bgm; bgm=null;
+    clearInterval(bgmTimer); bgmTimer=null;
+    try{ nodes.master.gain.cancelScheduledValues(a.currentTime); nodes.master.gain.linearRampToValueAtTime(0.0001,a.currentTime+0.6);}catch(e){}
+    setTimeout(()=>{ try{ nodes.o1.stop(); nodes.o2.stop(); nodes.ws.stop(); nodes.lfo&&nodes.lfo.stop(); nodes.lfo2&&nodes.lfo2.stop(); (nodes.padOscs||[]).forEach(p=>{try{p.stop();}catch(e){}}); }catch(e){} },700);
+  }
+  // ---- BOSS 专属音效 4 件套(听觉区分大佬 vs 杂兵)----
+  // Tidelord:海水冰冷感(低频 + 长尾金属环)
+  // Leviathan:肉嗓地狱感(双层 sub + 残响吼声)
+  function bossRoar(type, x){ const a=ensure(); if(!a)return; const t=a.currentTime;
+    const P = type==='leviathan' ? {f0:32, dur:1.6, fmt:240, vol:0.50} : {f0:42, dur:1.4, fmt:300, vol:0.46};
+    const out=a.createGain(); out.gain.setValueAtTime(0.0001,t); out.gain.linearRampToValueAtTime(P.vol,t+0.10); out.gain.setValueAtTime(P.vol,t+P.dur*0.65); out.gain.exponentialRampToValueAtTime(0.0001,t+P.dur);
+    out.connect(panTo(a,x));
+    // 双 sub 锯齿 detune
+    [P.f0, P.f0*1.005, P.f0*2].forEach((f,i)=>{ const o=a.createOscillator(),g=a.createGain(); o.type='sawtooth'; o.frequency.setValueAtTime(f,t); o.frequency.linearRampToValueAtTime(f*1.35,t+P.dur*0.7); g.gain.value=[0.9,0.85,0.45][i]; o.connect(g).connect(out); o.start(t); o.stop(t+P.dur); });
+    // formant bandpass
+    const bp=a.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=5.5; bp.frequency.setValueAtTime(P.fmt*0.6,t); bp.frequency.linearRampToValueAtTime(P.fmt*1.5,t+P.dur*0.6);
+    // 气声噪声层
+    const nN=Math.floor(a.sampleRate*P.dur),nb=a.createBuffer(1,nN,a.sampleRate),nd=nb.getChannelData(0);
+    for(let i=0;i<nN;i++){ const e=Math.min(1,i/(nN*0.06))*(1-i/nN); nd[i]=(Math.random()*2-1)*e; }
+    const ns=a.createBufferSource(); ns.buffer=nb;
+    const ng=a.createGain(); ng.gain.value=0.32;
+    ns.connect(bp).connect(ng).connect(out); ns.start(t); ns.stop(t+P.dur);
+  }
+  function bossHit(x){ const a=ensure(); if(!a)return; const t=a.currentTime;
+    // 金属铛 + 肉响混合(高频脆 + 中频闷)
+    const _sink=panTo(a,x);
+    const k=a.createOscillator(),kg=a.createGain(); k.type='square'; k.frequency.setValueAtTime(1800,t); k.frequency.exponentialRampToValueAtTime(220,t+0.08); env(kg,t,0.001,0.20,0.10); k.connect(kg).connect(_sink); k.start(t); k.stop(t+0.11);
+    _burstTo(a,t,0.10,0.30,0.002,80,1200,0.5,_sink);
+    _burstTo(a,t,0.004,0.42,0.0004,4500,12000,0.6,_sink);
+  }
+  function bossPhase(x){ const a=ensure(); if(!a)return; const t=a.currentTime;
+    // 低频塌缩 sub-drop(80→26Hz) + 远雷噪声
+    const _sink=panTo(a,x);
+    const o=a.createOscillator(),g=a.createGain(); o.type='sine'; o.frequency.setValueAtTime(80,t); o.frequency.exponentialRampToValueAtTime(26,t+0.55); env(g,t,0.01,0.65,0.9); o.connect(g).connect(_sink); o.start(t); o.stop(t+1.0);
+    _burstTo(a,t+0.05,0.8,0.18,0.05,40,420,0.4,_sink);
+    // 上扬警示 chirp
+    const c=a.createOscillator(),cg=a.createGain(); c.type='triangle'; c.frequency.setValueAtTime(180,t); c.frequency.linearRampToValueAtTime(900,t+0.4); env(cg,t,0.01,0.18,0.6); c.connect(cg).connect(_sink); c.start(t); c.stop(t+0.6);
+  }
+  function bossDeath(type){ const a=ensure(); if(!a)return; const t=a.currentTime;
+    // 长 sub-drop 塌缩 + 高频金属环(tidelord)或低频肉感(leviathan)+ 远雷余响
+    const isLev = type==='leviathan';
+    const o=a.createOscillator(),g=a.createGain(); o.type='sawtooth'; o.frequency.setValueAtTime(isLev?60:80,t); o.frequency.exponentialRampToValueAtTime(20,t+1.5); env(g,t,0.02,0.55,2.2); o.connect(g).connect(bus(a)); o.start(t); o.stop(t+2.4);
+    burst(a,t,1.8,0.22,0.06,40,isLev?320:1200,0.4);                                // 长尾
+    if(!isLev){ const m=a.createOscillator(),mg=a.createGain(); m.type='triangle'; m.frequency.setValueAtTime(1600,t); m.frequency.exponentialRampToValueAtTime(440,t+1.0); env(mg,t,0.02,0.20,1.5); m.connect(mg).connect(bus(a)); m.start(t); m.stop(t+1.6); }
+  }
+  // r30: Level-complete stinger — 0.9s 短促铜管胜利动机(C-E-G triad rising + 余响)
+  function levelStinger(){ const a=ensure(); if(!a)return; const t=a.currentTime;
+    // 3 音三连音 C5-E5-G5 鼓点节奏(160ms 间隔),每音 sawtooth + lowpass 模拟铜管
+    const NOTES = [523.25, 659.25, 783.99]; // C5 E5 G5
+    NOTES.forEach((f, i) => {
+      const tt = t + i*0.13;
+      // 主铜管:sawtooth + lowpass
+      const o = a.createOscillator(), g = a.createGain(), lp = a.createBiquadFilter();
+      o.type='sawtooth'; o.frequency.value=f;
+      lp.type='lowpass'; lp.frequency.value=2200; lp.Q.value=1.4;
+      env(g, tt, 0.005, 0.10, 0.32);
+      g.gain.linearRampToValueAtTime(0.001, tt+0.42);
+      o.connect(lp).connect(g).connect(bus(a)); o.start(tt); o.stop(tt+0.46);
+      // 八度上叠 sine 增亮
+      const o2=a.createOscillator(), g2=a.createGain();
+      o2.type='sine'; o2.frequency.value=f*2;
+      env(g2, tt, 0.005, 0.06, 0.20);
+      o2.connect(g2).connect(bus(a)); o2.start(tt); o2.stop(tt+0.26);
+    });
+    // 余响:G5 持留 0.4s 加 sub-bass C3 enforcement
+    const sub=a.createOscillator(), sg=a.createGain();
+    sub.type='triangle'; sub.frequency.value=130.81;  // C3 sub
+    env(sg, t+0.26, 0.02, 0.18, 0.55);
+    sub.connect(sg).connect(bus(a)); sub.start(t+0.26); sub.stop(t+0.85);
+    // 高频金属"叮"在末点 G7 衰减
+    const ring=a.createOscillator(), rg=a.createGain();
+    ring.type='sine'; ring.frequency.value=3135.96;  // G7
+    env(rg, t+0.39, 0.001, 0.04, 0.55);
+    ring.connect(rg).connect(bus(a)); ring.start(t+0.39); ring.stop(t+0.95);
+  }
+  // r30: BOSS-defeat orchestral hit — 1.3s 重低音管弦合击(BOSS 击败专属)
+  function bossStinger(){ const a=ensure(); if(!a)return; const t=a.currentTime;
+    // 1. 低音管 C2 长持留(sawtooth + 多 detune)
+    const ROOT=65.41; // C2
+    [1, 1.005, 0.995].forEach(d=>{
+      const o=a.createOscillator(), g=a.createGain(), lp=a.createBiquadFilter();
+      o.type='sawtooth'; o.frequency.value=ROOT*d;
+      lp.type='lowpass'; lp.frequency.value=600;
+      env(g, t, 0.04, 0.65, 1.10);
+      o.connect(lp).connect(g).connect(bus(a)); o.start(t); o.stop(t+1.15);
+    });
+    // 2. 5度 G2 同步堆(更厚)
+    {
+      const o=a.createOscillator(), g=a.createGain(), lp=a.createBiquadFilter();
+      o.type='sawtooth'; o.frequency.value=ROOT*1.5;  // G2 power 5th
+      lp.type='lowpass'; lp.frequency.value=800;
+      env(g, t, 0.04, 0.50, 1.10);
+      o.connect(lp).connect(g).connect(bus(a)); o.start(t); o.stop(t+1.15);
+    }
+    // 3. 鼓点 — 60Hz sub 大鼓 hit(0ms / 200ms / 600ms)
+    [0, 0.20, 0.60].forEach(d=>{
+      const tt=t+d;
+      const k=a.createOscillator(), kg=a.createGain(), klp=a.createBiquadFilter();
+      k.type='sine'; k.frequency.setValueAtTime(120, tt); k.frequency.exponentialRampToValueAtTime(48, tt+0.10);
+      klp.type='lowpass'; klp.frequency.value=200;
+      kg.gain.setValueAtTime(0,tt); kg.gain.linearRampToValueAtTime(0.85, tt+0.015); kg.gain.exponentialRampToValueAtTime(0.001, tt+0.32);
+      k.connect(klp).connect(kg).connect(bus(a)); k.start(tt); k.stop(tt+0.34);
+    });
+    // 4. 钹噪声 hit at 0ms + 600ms(白噪 hi-pass 短促)
+    [0, 0.60].forEach(d=>{
+      const tt=t+d;
+      // 用 burst 函数模拟噪声(已有 helper)
+      burst(a, tt, 0.18, 0.32, 0.005, 12, 4000, 0.65);
+    });
+    // 5. 末点 8va 高频铜管 high-G(G3=196,放高 5 octave=6272)显赞美感
+    const hi=a.createOscillator(), hg=a.createGain();
+    hi.type='triangle'; hi.frequency.value=783.99; // G5
+    env(hg, t+0.50, 0.02, 0.35, 0.60);
+    hi.connect(hg).connect(bus(a)); hi.start(t+0.50); hi.stop(t+1.10);
+  }
+  // ---- SFX 分型补全(听觉差异化反馈)----
+  function headshot(){ const a=ensure(); if(!a)return; const t=a.currentTime;
+    // 高频亮脆 click + 骨裂 + 短金属环
+    burst(a,t,0.003,0.55,0.0003,6500,18000,0.7);
+    burst(a,t,0.08,0.22,0.001,200,1400,0.4);
+    const k=a.createOscillator(),kg=a.createGain(); k.type='triangle'; k.frequency.setValueAtTime(2200,t); k.frequency.exponentialRampToValueAtTime(600,t+0.08); env(kg,t,0.001,0.16,0.10); k.connect(kg).connect(bus(a)); k.start(t); k.stop(t+0.12);
+  }
+  function ammoPickup(){ const a=ensure(); if(!a)return; const t=a.currentTime;
+    // 金属脆响 + 上扬 + 弹壳碰撞
+    tone(720,0.05,'square',0.10);
+    setTimeout(()=>tone(1080,0.07,'square',0.09),60);
+    burst(a,t+0.02,0.04,0.10,0.001,2000,8000,0.5);
+  }
+  function healPickup(){ const a=ensure(); if(!a)return; const t=a.currentTime;
+    // 温暖和弦(三角波三连音)
+    [523,659,784].forEach((f,i)=>{ const o=a.createOscillator(),g=a.createGain(); o.type='triangle'; o.frequency.value=f; env(g,t+i*0.02,0.005,0.08,0.5); o.connect(g).connect(bus(a)); o.start(t+i*0.02); o.stop(t+0.55+i*0.02); });
+  }
+  function boostPickup(){ const a=ensure(); if(!a)return; const t=a.currentTime;
+    // 高频上扬 power-up
+    const o=a.createOscillator(),g=a.createGain(); o.type='sawtooth'; o.frequency.setValueAtTime(420,t); o.frequency.exponentialRampToValueAtTime(1800,t+0.30); env(g,t,0.005,0.15,0.35); o.connect(g).connect(bus(a)); o.start(t); o.stop(t+0.40);
+    burst(a,t+0.02,0.10,0.16,0.001,1200,7000,0.4);
+    setTimeout(()=>tone(2400,0.06,'sine',0.10),200);
+  }
+  function reloadDone(){ const a=ensure(); if(!a)return; const t=a.currentTime;
+    // 'kha-chack' 双击金属
+    burst(a,t,0.03,0.30,0.0005,1200,6000,0.6);
+    setTimeout(()=>{ const t2=ensure().currentTime; burst(a,t2,0.04,0.35,0.0005,800,4500,0.5); tone(420,0.04,'square',0.10); },90);
+  }
+  let _lastLowTick=0;
+  function lowAmmoTick(){ const a=ensure(); if(!a)return; const t=a.currentTime;
+    if(t-_lastLowTick<0.4)return;                                         // 节流 0.4s
+    _lastLowTick=t;
+    const o=a.createOscillator(),g=a.createGain(); o.type='sine'; o.frequency.value=880; env(g,t,0.002,0.08,0.10); o.connect(g).connect(bus(a)); o.start(t); o.stop(t+0.12);
+  }
+  // r23: 电报机滴音(字幕逐字打印同步)
+  function telegraphDit(){ const a=ensure(); if(!a)return; const t=a.currentTime;
+    const o=a.createOscillator(),g=a.createGain(); o.type='sine'; o.frequency.value=1100+Math.random()*180; env(g,t,0.001,0.045,0.035); o.connect(g).connect(bus(a)); o.start(t); o.stop(t+0.045);
+  }
+  // r27: 心跳音(危急时驱动)— 低频 thump + 二次轻 thump 模拟 "lub-dub"
+  function heartbeat(intensity){
+    const a=ensure(); if(!a)return; const t=a.currentTime;
+    const I = Math.max(0.25, Math.min(1.2, intensity||0.8));
+    // 主 thump:48Hz sine + lowpass,短促
+    const o1=a.createOscillator(), g1=a.createGain(), lp=a.createBiquadFilter();
+    o1.type='sine'; o1.frequency.value=52; lp.type='lowpass'; lp.frequency.value=180;
+    g1.gain.setValueAtTime(0,t); g1.gain.linearRampToValueAtTime(0.55*I,t+0.018); g1.gain.exponentialRampToValueAtTime(0.001,t+0.18);
+    o1.connect(lp).connect(g1).connect(bus(a)); o1.start(t); o1.stop(t+0.20);
+    // 副 thump:120ms 后更轻
+    const o2=a.createOscillator(), g2=a.createGain(), lp2=a.createBiquadFilter();
+    o2.type='sine'; o2.frequency.value=44; lp2.type='lowpass'; lp2.frequency.value=140;
+    g2.gain.setValueAtTime(0,t+0.13); g2.gain.linearRampToValueAtTime(0.30*I,t+0.148); g2.gain.exponentialRampToValueAtTime(0.001,t+0.30);
+    o2.connect(lp2).connect(g2).connect(bus(a)); o2.start(t+0.13); o2.stop(t+0.32);
+  }
+  // r26: 主音量控制(影响 SFX bus + 所有 BGM)
+  let _userVol = 1.0, _muted = false;
+  function _applyVol(){
+    const a=ensure(); if(!a)return; bus(a);
+    if(_masterGain) _masterGain.gain.value = _muted ? 0 : _userVol;
+    ['battleBgm','titleBgm','victoryBgm','bossBgm'].forEach(id=>{
+      const el=document.getElementById(id); if(el){ el._baseVol = el._baseVol!=null?el._baseVol:el.volume;
+        el.muted = _muted; }
+    });
+  }
+  function setMasterVolume(v){ _userVol = Math.max(0, Math.min(1, v)); _applyVol();
+    try{ localStorage.setItem('bt_vol', String(_userVol)); }catch(e){} }
+  function setMuted(m){ _muted = !!m; _applyVol();
+    try{ localStorage.setItem('bt_mute', _muted?'1':'0'); }catch(e){} }
+  function getMasterVolume(){ return _userVol; }
+  function getMuted(){ return _muted; }
+  // 启动时恢复持久化偏好
+  try{ const v=parseFloat(localStorage.getItem('bt_vol')); if(!isNaN(v))_userVol=v;
+       const m=localStorage.getItem('bt_mute'); if(m==='1')_muted=true; }catch(e){}
+  return {
+    setMasterVolume, setMuted, getMasterVolume, getMuted, _applyVol,
+    telegraphDit, heartbeat, setWorldWidth, panTo, levelStinger, bossStinger,
+    diveIn, diveOut, bossRoar, bossHit, bossPhase, bossDeath,
+    headshot, ammoPickup, healPickup, boostPickup, reloadDone, lowAmmoTick, bgmCrossfade,
+    startBGM, stopBGM, roar,
+    shot(x){ const a=ensure(); if(!a)return; const t=a.currentTime; const J=()=>1+rnd(-0.05,0.05); const _sink=panTo(a,x);
+      const k=a.createOscillator(),kg=a.createGain(); k.type='sine'; k.frequency.setValueAtTime(110*J(),t); k.frequency.exponentialRampToValueAtTime(45,t+0.06); env(kg,t,0.002,0.78,0.13); k.connect(kg).connect(_sink); k.start(t); k.stop(t+0.14);
+      const k2=a.createOscillator(),k2g=a.createGain(); k2.type='triangle'; k2.frequency.setValueAtTime(78*J(),t); k2.frequency.exponentialRampToValueAtTime(46,t+0.05); env(k2g,t,0.002,0.30,0.09); k2.connect(k2g).connect(_sink); k2.start(t); k2.stop(t+0.10);
+      const b=a.createOscillator(),bg=a.createGain(),bf=a.createBiquadFilter(); b.type='sawtooth'; b.frequency.setValueAtTime(190*J(),t); b.frequency.exponentialRampToValueAtTime(120,t+0.07); bf.type='bandpass'; bf.frequency.value=420; bf.Q.value=1.1; env(bg,t,0.003,0.28,0.08); b.connect(bf).connect(bg).connect(_sink); b.start(t); b.stop(t+0.09);
+      const b2=a.createOscillator(),b2g=a.createGain(); b2.type='triangle'; b2.frequency.setValueAtTime(330*J(),t); b2.frequency.exponentialRampToValueAtTime(210,t+0.05); env(b2g,t,0.003,0.15,0.06); b2.connect(b2g).connect(_sink); b2.start(t); b2.stop(t+0.07);
+      _burstTo(a,t,0.004,0.50,0.0004,5500,16000,0.7,_sink);
+      _burstTo(a,t+0.001,0.012,0.30,0.0006,1800,8000,0.6,_sink);
+      _burstTo(a,t+0.012,0.12,0.13,0.006,160,900,0.4,_sink);
+      const m=a.createOscillator(),mg=a.createGain(); m.type='square'; m.frequency.setValueAtTime(2600*J(),t+0.018); env(mg,t+0.018,0.001,0.05,0.02); m.connect(mg).connect(_sink); m.start(t+0.018); m.stop(t+0.045);
+      _burstTo(a,t+0.02,0.01,0.06,0.0005,3000,9000,1.2,_sink); },
+    shotgun(x){ const a=ensure(); if(!a)return; const t=a.currentTime; const _sink=panTo(a,x);
+      const k=a.createOscillator(),kg=a.createGain(); k.type='sine'; k.frequency.setValueAtTime(140,t); k.frequency.exponentialRampToValueAtTime(42,t+0.10); env(kg,t,0.002,0.95,0.18); k.connect(kg).connect(_sink); k.start(t); k.stop(t+0.2);
+      _burstTo(a,t,0.05,0.62,0.001,380,5200,0.5,_sink); _burstTo(a,t,0.006,0.5,0.0004,4200,15000,0.7,_sink); _burstTo(a,t+0.02,0.24,0.18,0.012,110,1100,0.4,_sink); },
+    rifle(x){ const a=ensure(); if(!a)return; const t=a.currentTime; const _sink=panTo(a,x);
+      const k=a.createOscillator(),kg=a.createGain(); k.type='sine'; k.frequency.setValueAtTime(170,t); k.frequency.exponentialRampToValueAtTime(60,t+0.05); env(kg,t,0.001,0.72,0.10); k.connect(kg).connect(_sink); k.start(t); k.stop(t+0.12);
+      _burstTo(a,t,0.003,0.72,0.0003,6200,17000,0.8,_sink);
+      const b=a.createOscillator(),bg=a.createGain(); b.type='sawtooth'; b.frequency.setValueAtTime(300,t); b.frequency.exponentialRampToValueAtTime(150,t+0.06); env(bg,t,0.002,0.3,0.07); b.connect(bg).connect(_sink); b.start(t); b.stop(t+0.08);
+      _burstTo(a,t+0.03,0.4,0.10,0.02,180,1500,0.5,_sink); },
+    flame(x){ const a=ensure(); if(!a)return; const t=a.currentTime; const _sink=panTo(a,x);
+      _burstTo(a,t,0.13,0.11,0.02,80,1500,0.3,_sink);
+      if(Math.random()<0.3){ const h=a.createOscillator(),hg=a.createGain(); h.type='sawtooth'; h.frequency.setValueAtTime(rnd(95,150),t); env(hg,t,0.01,0.05,0.11); h.connect(hg).connect(_sink); h.start(t); h.stop(t+0.13); } },
+    dry(){ tone(150,.04,'square',.05); },
+    reload(){ tone(280,.06,'square',.06); setTimeout(()=>tone(500,.07,'square',.06),140); setTimeout(()=>noise(.04,.05),280); },
+    hit(x){ const a=ensure(); if(!a){ noise(.05,.08,1500); return; }
+      const _sink=panTo(a,x);
+      const n=Math.floor(a.sampleRate*0.05),buf=a.createBuffer(1,n,a.sampleRate),d=buf.getChannelData(0); for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
+      const s=a.createBufferSource(),g=a.createGain(),f=a.createBiquadFilter(); s.buffer=buf; f.type='lowpass'; f.frequency.value=1500; g.gain.value=.08; s.connect(f).connect(g).connect(_sink); s.start(); },
+    kill(x){ const a=ensure(); if(!a){ tone(rnd(80,120),.22,'sawtooth',.08,40); noise(.16,.10,1200); return; }
+      const _sink=panTo(a,x), t=a.currentTime;
+      const f0=rnd(80,120);
+      const o=a.createOscillator(),og=a.createGain(); o.type='sawtooth'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(40,t+0.22); og.gain.setValueAtTime(.08,t); og.gain.exponentialRampToValueAtTime(.0001,t+0.22); o.connect(og).connect(_sink); o.start(t); o.stop(t+0.24);
+      const n2=Math.floor(a.sampleRate*0.16),buf2=a.createBuffer(1,n2,a.sampleRate),d2=buf2.getChannelData(0); for(let i=0;i<n2;i++)d2[i]=(Math.random()*2-1)*(1-i/n2);
+      const s2=a.createBufferSource(),g2=a.createGain(),f2=a.createBiquadFilter(); s2.buffer=buf2; f2.type='lowpass'; f2.frequency.value=1200; g2.gain.value=.10; s2.connect(f2).connect(g2).connect(_sink); s2.start(); },
+    hurt(){ tone(150,.3,'sawtooth',.12,55); noise(.22,.16,900); },
+    wave(){ tone(330,.16,'triangle',.07); setTimeout(()=>tone(495,.2,'triangle',.07),150); },
+    supply(){ tone(820,.1,'triangle',.06); setTimeout(()=>tone(1230,.14,'triangle',.06),100); },
+    thunder(){ noise(.8,.18,500); tone(60,.7,'sine',.10,30); },
+    over(){ tone(300,.6,'sawtooth',.12,60); setTimeout(()=>tone(190,.9,'sawtooth',.12,40),250); }
+  };
+})();
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+/* ---------- 敌人类型 ---------- */
+// nearH = 逼近至碉堡(p=1)时的显示高度(px);按目标高度缩放兼容动画帧+静态贴图两种原生尺寸
+// walkKey/walkAnim = 真·走路序列帧动画(图生视频管线产出);缺失则回退静态贴图+程序化步态
+const TYPES = {
+  soldier: { tex:'z_soldier', walkKey:'z_soldier_walk', walkAnim:'walk_soldier', hp:3,  speed:0.058, dmg:8,  score:10, nearH:300, step:7.0,  rock:2.4, bob:0.055, tint:0xfff2dc },
+  runner:  { tex:'z_runner',  walkKey:'z_runner_walk', walkAnim:'walk_runner', hp:2,  speed:0.110, dmg:6,  score:16, nearH:250, step:12.5, rock:3.6, bob:0.080, tint:0xfff2dc },
+  elite:   { tex:'z_elite',   walkKey:'z_elite_walk',  walkAnim:'walk_elite',  hp:7,  speed:0.050, dmg:13, score:34, nearH:330, step:5.6,  rock:1.9, bob:0.045, tint:0xfff2dc },
+  brute:   { tex:'z_brute',   walkKey:'z_brute_walk', walkAnim:'walk_brute', hp:16, speed:0.032, dmg:24, score:70, nearH:460, step:4.2,  rock:1.6, bob:0.060, tint:0xffe8c4 },
+  // —— 扩充兵种(行为驱动)——
+  exploder:{ tex:'z_exploder',walkKey:'z_exploder_walk', walkAnim:'walk_exploder', hp:4,  speed:0.078, dmg:0,  score:30, nearH:300, step:9.0,  rock:3.2, bob:0.075, tint:0xffe0d0, behavior:'explode' },
+  spitter: { tex:'z_spitter', walkKey:'z_spitter_walk', walkAnim:'walk_spitter', hp:5,  speed:0.052, dmg:0,  score:32, nearH:300, step:6.0,  rock:2.0, bob:0.050, tint:0xe6ffe0, behavior:'ranged', stopAt:0.60, fireEvery:2.0 },
+  armored: { tex:'z_armored', walkKey:'z_armored_walk', walkAnim:'walk_armored', hp:30, speed:0.030, dmg:22, score:85, nearH:430, step:4.0,  rock:1.3, bob:0.050, tint:0xfff2dc, behavior:'armored' },
+  // —— BOSS 兵种(高血/慢/巨型/震屏入场)——
+  tidelord:  { tex:'z_boss_tidelord',  hp:180, speed:0.022, dmg:35, score:600,  nearH:520, step:3.0, rock:1.0, bob:0.040, tint:0xbcd8ff, boss:true, bossName:'TIDELORD' },
+  leviathan: { tex:'z_boss_leviathan', hp:320, speed:0.018, dmg:45, score:1200, nearH:600, step:2.6, rock:0.8, bob:0.038, tint:0xffc6c6, boss:true, bossName:'LEVIATHAN OF THE BLACK TIDE' },
+};
+// 海岸线(出生·远·小)→ 碉堡前(近·大)。比例随透视:远处约 60px,近处人高
+const HORIZON_Y = 314, FRONT_Y = 778;
+
+// 武器注册表(数字键 1-4 / 滚轮切换 · 各自弹药/手感/SFX/前景贴图)
+const WEAPONS = [
+  { id:'mg',      name:'MG-42 Machine Gun', tex:'gun_fp',     fireRate:80,  dmg:1,   headMul:2, pellets:1, spread:0,  clip:180, reloadDur:2.4, auto:true,  sfx:'shot',    recoil:1,   scaleW:0.66 },
+  { id:'shotgun', name:'Trench Shotgun',    tex:'gun_shotgun',fireRate:620, dmg:1,   headMul:2, pellets:8, spread:78, clip:8,   reloadDur:2.0, auto:false, sfx:'shotgun', recoil:3.2, scaleW:0.62 },
+  { id:'rifle',   name:'Sniper Rifle',      tex:'gun_rifle',  fireRate:780, dmg:5,   headMul:3, pellets:1, spread:0,  clip:10,  reloadDur:2.7, auto:false, sfx:'rifle',   recoil:4,   scaleW:0.60 },
+  { id:'flamer',  name:'Flamethrower',      tex:'gun_flamer', fireRate:45,  dmg:0.6, headMul:1, pellets:1, spread:0,  clip:320, reloadDur:3.2, auto:true,  sfx:'flame',   recoil:0.4, scaleW:0.64, flame:true },
+];
+// 场景注册表(每 3 波切换 · 缺贴图自动跳过)
+const SCENES = [
+  { key:'bg',         name:'Last Cape · Dawn',         tint:0xcfd8da },
+  { key:'bg_night',   name:'Black Cove · Flares',      tint:0xb8c0d8 },
+  { key:'bg_seawall', name:'Iron Seawall · Fog',       tint:0xc8d2d4 },
+  { key:'bg_trench',  name:'Sandbag Trench · Dusk',    tint:0xc6cfd8 },
+  { key:'bg_ruins',   name:'Cathedral Ruins · Vigil',  tint:0xc8c0bc },
+];
+// 10 章节叙事(每关固定章节名 + 关-场景映射,故事推进)
+const CHAPTERS = [
+  null, // L1=null 占位(level 从 1 起)
+  { name:'I · THE FIRST TOLL',          sub:'Bell tower, third toll. They are walking.', sceneIdx:0 },
+  { name:'II · BLACK TIDE RISES',       sub:'Tide at +2m. Cycle 9, hour one.',           sceneIdx:0 },
+  { name:'III · THE DROWNED MARCH',     sub:'Signal flare seven. The cove answers.',     sceneIdx:1 },
+  { name:'IV · TRENCH OF ECHOES',       sub:"Mud to the knees. The dead don't slow.",    sceneIdx:3 },
+  { name:'V · THE TIDELORD WAKES',      sub:'Cycle 9 always breaks here. Not today.',    sceneIdx:2 },
+  { name:'VI · CATHEDRAL OF THE DEAD',  sub:'The chapel bell still hangs. Barely.',      sceneIdx:4 },
+  { name:'VII · STORM VIGIL',           sub:'Lightning every fifteen seconds. Count them.', sceneIdx:1 },
+  { name:'VIII · WHISPERS FROM THE DEEP',sub:'Hour nine. The sea is louder than my rifle.', sceneIdx:2 },
+  { name:'IX · THE FINAL BEACH',        sub:'One wall. One marshal. One hundred years.', sceneIdx:0 },
+  { name:'X · LEVIATHAN OF THE BLACK TIDE', sub:'Hundred-year tide, last shore, last shot.', sceneIdx:4 },
+];
+// r28 Pick B: 10 章电影引言(BLACKTIDE 世界观 · Marshal Eisen 守 Last Cape 抗 drowned dead · Cycle 9)
+const EPIGRAPHS = [
+  null,
+  { roman:'I',    sub:'THE FIRST TOLL',             quote:'The bell tower tolled thrice at low tide. The dead heard it first.' },
+  { roman:'II',   sub:'BLACK TIDE RISES',           quote:'Hour one of Cycle 9. The seawall is wet from the inside.' },
+  { roman:'III',  sub:'THE DROWNED MARCH',          quote:'Seven flares fired into the cove. Seven flares the cove returned.' },
+  { roman:'IV',   sub:'TRENCH OF ECHOES',           quote:'Knee-deep in cold mud. Their hands close on my ankles before I see them.' },
+  { roman:'V',    sub:'THE TIDELORD WAKES',         quote:'Every Cycle the line breaks here. The last marshal did not write why.' },
+  { roman:'VI',   sub:'CATHEDRAL OF THE DEAD',      quote:'The crypt door was barred from the outside. It is no longer barred.' },
+  { roman:'VII',  sub:'STORM VIGIL',                quote:'Lightning every fifteen seconds. I have learned to aim in the dark between.' },
+  { roman:'VIII', sub:'WHISPERS FROM THE DEEP',     quote:"Hour nine. The sea is speaking my name in my mother's voice." },
+  { roman:'IX',   sub:'THE FINAL BEACH',            quote:'One wall. One marshal. One hundred years of held ground.' },
+  { roman:'X',    sub:'LEVIATHAN OF THE BLACK TIDE',quote:'Cycle 9 ends tonight. The Leviathan or me. Not both.' },
+];
+// Marshal Eisen 战场对白(章节起/BOSS 出场/濒死/胜利)
+const EISEN_LINES = {
+  chapter:[null,
+    "Hold the toll.",
+    "Seawall — do not yield.",
+    "They come from the cove. Hold.",
+    "Knees in mud. Eyes up.",
+    "Tidelord. I know your shape.",
+    "In a chapel. With a rifle.",
+    "Count the lightning. Aim between.",
+    "It is louder than I remember.",
+    "Last cape. Last bell.",
+    "Leviathan. End of Cycle 9."
+  ],
+  bossEntrance:{ tidelord:"I dreamed of you, Tidelord.", leviathan:"You woke the sea. I end it." },
+  lowHealth:["Bunker's bleeding.","One more wave. One more.","Not today. Not Cycle 9."],
+  finalVictory:"Cycle 9 holds."
+};
+// 怪物走路序列帧(图生视频管线 · 缺失类型回退静态+程序化步态)
+const WALK_SHEETS = [
+  { key:'z_soldier_walk', file:'assets/anim/zombie-soldier/walk-sheet-sm.png', fw:240, fh:323 },
+  { key:'z_runner_walk',  file:'assets/anim/zombie-runner/walk-sheet-sm.png',  fw:200, fh:269 },
+  { key:'z_elite_walk',   file:'assets/anim/zombie-elite/walk-sheet-sm.png',   fw:200, fh:269 },
+  { key:'z_spitter_walk', file:'assets/anim/zombie-spitter/walk-sheet-sm.png', fw:200, fh:271 },
+  { key:'z_armored_walk', file:'assets/anim/zombie-armored/walk-sheet-sm.png', fw:200, fh:410 },
+  { key:'z_brute_walk',   file:'assets/anim/zombie-brute/walk-sheet-sm.png',   fw:200, fh:276 },
+  { key:'z_exploder_walk',file:'assets/anim/zombie-exploder/walk-sheet-sm.png',fw:200, fh:269 },
+];
+
+/* ============================================================================ */
+class Battle extends Phaser.Scene {
+  constructor(){ super('Battle'); }
+
+  preload(){
+    this.load.image('bg', 'assets/bg-beach.png');
+    this.load.image('z_soldier', 'assets/zombie-soldier.png');
+    this.load.image('z_runner',  'assets/zombie-runner.png');
+    this.load.image('z_elite',   'assets/zombie-elite.png');
+    this.load.image('z_brute',   'assets/zombie-brute.png');
+    this.load.image('gun_fp',    'assets/gun-fp.png');
+    // 真·走路序列帧(图生视频管线 · 缺失的类型回退静态贴图)
+    WALK_SHEETS.forEach(w=>this.load.spritesheet(w.key, w.file, { frameWidth:w.fw, frameHeight:w.fh }));
+    // 新怪物 / 新武器 / 新场景(子 agent 异步生成 · 缺失则优雅降级,不刷错)
+    this.load.on('loaderror', ()=>{});
+    ['exploder','spitter','armored'].forEach(k=>this.load.image('z_'+k,'assets/zombie-'+k+'.png'));
+    ['shotgun','rifle','flamer'].forEach(k=>this.load.image('gun_'+k,'assets/gun-'+k+'.png'));
+    this.load.image('bg_night','assets/bg-night.png');
+    this.load.image('bg_seawall','assets/bg-seawall.png');
+    this.load.image('bg_trench','assets/bg-trench.png');
+    this.load.image('bg_ruins','assets/bg-ruins.png');
+    // 动画化 FX 序列帧(黑底 · ADD 叠加 · 视频生成抽帧)
+    this.load.spritesheet('fx_flame','assets/fx/flame-gpt-sheet.png',{frameWidth:200,frameHeight:300});
+    this.load.spritesheet('fx_muzzle','assets/fx/muzzle-gpt-sheet.png',{frameWidth:220,frameHeight:220});
+    this.load.spritesheet('fx_skull','assets/fx/skull-sheet.png',{frameWidth:240,frameHeight:240});
+    ['ammo','heal','boost'].forEach(k=>this.load.image('sup_'+k,'assets/supplies/sup-'+k+'.png'));
+    this.load.image('z_boss_tidelord','assets/boss-tidelord.png');
+    this.load.image('z_boss_leviathan','assets/boss-leviathan.png');
+    // r28: Leviathan 8 帧多角度动画 sprite sheet (4 列 x 2 行 / 单 cell 360x360)
+    this.load.spritesheet('z_boss_leviathan_anim','assets/leviathan-anim-sheet.png',{frameWidth:360,frameHeight:360});
+  }
+
+  create(){
+    this.makeTextures();
+    // 照片类贴图显式锁 LINEAR 过滤(消发虚/锯齿)
+    ['bg','z_soldier','z_runner','z_elite','z_brute','z_soldier_walk','gun_fp'].forEach(k=>{ if(this.textures.exists(k)) this.textures.get(k).setFilter(Phaser.Textures.FilterMode.LINEAR); });
+    // 走路动画(序列帧就绪才建,缺失类型走静态贴图回退)
+    Object.values(TYPES).forEach(c=>{
+      if(c.walkKey && this.textures.exists(c.walkKey) && !this.anims.exists(c.walkAnim)){
+        const n=this.textures.get(c.walkKey).frameTotal-1;
+        this.anims.create({ key:c.walkAnim, frames:this.anims.generateFrameNumbers(c.walkKey,{start:0,end:Math.max(0,n-1)}), frameRate:10, repeat:-1 });
+      }
+    });
+    // FX 动画(火焰循环 / 枪口闪光单次)
+    if(this.textures.exists('fx_flame')&&!this.anims.exists('fx_flame')) this.anims.create({ key:'fx_flame', frames:this.anims.generateFrameNumbers('fx_flame',{start:0,end:3}), frameRate:14, repeat:-1 });
+    if(this.textures.exists('fx_muzzle')&&!this.anims.exists('fx_muzzle')) this.anims.create({ key:'fx_muzzle', frames:this.anims.generateFrameNumbers('fx_muzzle',{start:0,end:5}), frameRate:24, repeat:0 });
+    if(this.textures.exists('fx_skull')&&!this.anims.exists('fx_skull')) this.anims.create({ key:'fx_skull', frames:this.anims.generateFrameNumbers('fx_skull',{start:0,end:3}), frameRate:8, repeat:0 });
+    // 背景(cover · 场景管理器可切换)
+    const bg = this.add.image(DW/2, DH/2, 'bg');
+    const s = Math.max(DW/bg.width, DH/bg.height); bg.setScale(s);
+    bg.setTint(0xcfd8da);
+    this.bgImg = bg; this.sceneIdx = 0;
+    // 远景雾
+    this.fog = this.add.image(DW/2, HORIZON_Y-20, 'fog').setAlpha(.5).setBlendMode('SCREEN');
+
+    this.zombies = [];
+    this.bloods = this.add.particles(0,0,'spark',{ lifespan:600, speed:{min:60,max:280}, scale:{start:1.1,end:0}, alpha:{start:1,end:0}, tint:[0x7a1414,0xa01e1e,0x4a0c0c], gravityY:520, emitting:false, maxParticles:220 });
+    this.dust = this.add.particles(0,0,'spark',{ lifespan:500, speed:{min:30,max:140}, scale:{start:1.0,end:0}, alpha:{start:.7,end:0}, tint:[0x6b6256,0x8a8071], gravityY:260, emitting:false });
+    this.gore = this.add.particles(0,0,'spark',{ lifespan:1300, speed:{min:90,max:460}, scale:{start:2.4,end:0}, alpha:{start:1,end:0}, tint:[0x9c2b2b,0xd8c8b0,0x6e1818,0xb86b3a], gravityY:420, emitting:false }).setDepth(84);  // 爆头骨血碎屑
+    // r22: 命中分层粒子(血雾已有 bloods,新增 布絮 + 大肉块)
+    this.fleshChunk = this.add.particles(0,0,'spark',{ lifespan:900, speed:{min:140,max:380}, scale:{start:1.8,end:0}, alpha:{start:1,end:0}, tint:[0x8a2828,0xb84040,0x5a1010], gravityY:780, rotate:{min:-180,max:180}, emitting:false, maxParticles:120 }).setDepth(83);
+    this.clothShred = this.add.particles(0,0,'spark',{ lifespan:1400, speed:{min:40,max:160}, scale:{start:0.8,end:0}, alpha:{start:.8,end:0}, tint:[0x4a3a28,0x6a5040,0x3a2a1c], gravityY:220, emitting:false, maxParticles:80 }).setDepth(82);
+    // r22: 枪口烟雾(NORMAL blend,上升)+ 弹壳抛出(金黄,下落)
+    this.muzzleSmoke = this.add.particles(0,0,'spark',{ lifespan:520, speed:{min:18,max:55}, speedY:{min:-90,max:-40}, scale:{start:0.9,end:2.4}, alpha:{start:0.35,end:0}, tint:[0xcfd0d2,0xa8acae,0x6a6e72], gravityY:-30, emitting:false, blendMode:'NORMAL', maxParticles:60 }).setDepth(58);
+    this.shellEject = this.add.particles(0,0,'spark',{ lifespan:900, speed:{min:180,max:320}, angle:{min:30,max:65}, scale:{start:0.9,end:0.5}, alpha:{start:1,end:.4}, tint:[0xd8a850,0xb88820,0xf0c870], gravityY:980, rotate:{min:0,max:720}, emitting:false, maxParticles:40 }).setDepth(60);
+
+    // 雨
+    this.rain = this.add.particles(0,0,'rain',{ x:{min:-100,max:DW+100}, y:-20, lifespan:900, speedY:{min:900,max:1200}, speedX:{min:-160,max:-90}, scale:{start:1,end:1}, alpha:{start:.35,end:.12}, quantity:(window.devicePixelRatio>1?4:7), frequency:16, blendMode:'SCREEN' });
+    // 黑潮海面雾(地平线缓慢上升的暗紫雾,营造诅咒感)
+    this.tideFog = this.add.particles(0,0,'spark',{ x:{min:0,max:DW}, y:{min:HORIZON_Y-10,max:HORIZON_Y+30}, lifespan:3600, speedY:{min:-12,max:-26}, scale:{start:8,end:16}, alpha:{start:0.10,end:0}, tint:[0x2a1a3a,0x1a2a3a,0x3a2a4a], quantity:1, frequency:280, blendMode:'NORMAL' }).setDepth(48);
+    // 岸边海浪溅起的白色水花(地平线偶发短促)
+    this.seaSplash = this.add.particles(0,0,'spark',{ x:{min:0,max:DW}, y:{min:HORIZON_Y+8,max:HORIZON_Y+24}, lifespan:520, speedY:{min:-80,max:-180}, scale:{start:1.3,end:0}, alpha:{start:0.75,end:0}, tint:[0xdfe8f0,0xbfc8d6], gravityY:280, quantity:1, frequency:140, blendMode:'SCREEN' }).setDepth(49);
+    this.rain.setDepth(50);
+
+    // 枪械前景(真实第一人称机枪)+ 枪口
+    this.gun = this.add.image(DW/2, DH+12, 'gun_fp').setOrigin(0.5,1).setDepth(60);
+    this.gun.setScale((DW*0.66)/this.gun.width);
+    this.gunRestY = this.gun.y;
+    this.gunBaseX = DW/2; this.gunBaseY = this.gun.y;        // 枪随准星上下左右
+    this.gunAng = 0; this.recoil = 0;
+    this.barrelLen = this.gun.displayHeight*0.9;
+    this.muzzleX = DW/2;
+    this.muzzleY = this.gun.y - this.barrelLen;               // 枪管口
+    this.muzzle = this.add.image(this.muzzleX, this.muzzleY, 'muzzle').setOrigin(0.5,0.5).setDepth(61).setVisible(false).setBlendMode('ADD');
+    this.tracer = this.add.graphics().setDepth(59);
+    // 动画化 FX 精灵(枪口闪光单次 / 火焰循环 · 黑底 ADD)
+    if(this.textures.exists('fx_muzzle')) this.muzzleFx=this.add.sprite(this.muzzleX,this.muzzleY,'fx_muzzle').setOrigin(0.5,0.5).setDepth(62).setVisible(false).setBlendMode('ADD');
+    if(this.textures.exists('fx_flame')) this.flameSpr=this.add.sprite(this.muzzleX,this.muzzleY,'fx_flame').setOrigin(0.5,1).setDepth(59).setVisible(false).setBlendMode('ADD');
+    this._flameOnT=0;
+
+    // 暗角 + 闪电层
+    this.vig = this.add.image(DW/2, DH/2, 'vig').setDepth(70);
+    this.slowVig = this.add.image(DW/2,DH/2,'vig').setDepth(74).setAlpha(0).setBlendMode('MULTIPLY');  // 慢动作聚焦暗角
+    this.phaseVig = this.add.image(DW/2,DH/2,'vig_phase2').setDepth(73).setAlpha(0).setBlendMode('SCREEN'); // r22: BOSS phase 暗角
+    this.slowmoT=0; this.slowmoCD=0;
+    this.flash = this.add.rectangle(DW/2,DH/2,DW,DH,0xdfe9ff).setAlpha(0).setDepth(71).setBlendMode('SCREEN');
+    this.damageVig = this.add.image(DW/2,DH/2,'dmgvig').setDepth(72).setAlpha(0).setBlendMode('SCREEN');
+    // r27: Critical-HP alarm 红色脉冲暗角(MULTIPLY 让边缘真变红)
+    if(!this.textures.exists('crit_vig')){
+      const sz=Math.min(DW,DH), tex=this.textures.createCanvas('crit_vig', DW, DH); const cx=DW/2, cy=DH/2;
+      const g=tex.getContext().createRadialGradient(cx,cy,sz*0.18, cx,cy,sz*0.62);
+      g.addColorStop(0,'rgba(255,40,30,0)'); g.addColorStop(0.55,'rgba(255,30,20,0.35)'); g.addColorStop(1,'rgba(255,10,10,0.88)');
+      tex.getContext().fillStyle=g; tex.getContext().fillRect(0,0,DW,DH); tex.refresh();
+    }
+    this.critVig = this.add.image(DW/2,DH/2,'crit_vig').setDepth(74).setAlpha(0).setBlendMode('MULTIPLY');
+
+    // 准星
+    this.cross = this.add.image(DW/2,DH/2,'cross').setDepth(80);
+
+    this.buildHUD();
+    this.resetState();
+    this.bindInput();
+
+    // 闪电定时
+    this.time.addEvent({ delay:6500, loop:true, callback:()=>{ if(this.state!=='play')return; if(Math.random()<.5)this.lightning(); }});
+    // 远景偶发吼叫(节流,营造群体压迫)
+    this.time.addEvent({ delay:2200, loop:true, callback:()=>{ if(this.state!=='play')return; const active=this.waveActive||this.zombies.length>0; if(!active)return; if(Math.random()<0.28){ if((this.roarBusy||0)<2){ this.roarBusy=(this.roarBusy||0)+1; const pool=['soldier','elite','brute']; AudioFX.roar(pool[(Math.random()*pool.length)|0]); this.time.delayedCall(260,()=>{ this.roarBusy=Math.max(0,(this.roarBusy||1)-1); }); } } }});
+    // r28: stereo panning — tell AudioFX our world width so panTo can map enemy.x → [-1, +1]
+    AudioFX.setWorldWidth && AudioFX.setWorldWidth(DW);
+  }
+
+  /* ---------- 程序化贴图 ---------- */
+  makeTextures(){
+    // 血/灰 spark
+    let g=this.make.graphics({x:0,y:0,add:false});
+    g.fillStyle(0xffffff,1); g.fillCircle(6,6,6); g.generateTexture('spark',12,12); g.destroy();
+    // 雨线
+    g=this.make.graphics({x:0,y:0,add:false}); g.fillStyle(0xbcd0d8,1); g.fillRect(0,0,2,22); g.generateTexture('rain',2,22); g.destroy();
+    // 准星
+    g=this.make.graphics({x:0,y:0,add:false}); g.lineStyle(2,0xffe9a8,.9);
+    g.strokeCircle(20,20,14); g.lineBetween(20,2,20,12); g.lineBetween(20,28,20,38); g.lineBetween(2,20,12,20); g.lineBetween(28,20,38,20);
+    g.fillStyle(0xff5a3a,1); g.fillCircle(20,20,1.6); g.generateTexture('cross',40,40); g.destroy();
+    // 枪口火光(canvas 径向)
+    this.radialTex('muzzle',180,180,[[0,'rgba(255,250,210,1)'],[0.25,'rgba(255,200,90,0.95)'],[0.55,'rgba(255,120,40,0.5)'],[1,'rgba(255,80,20,0)']]);
+    // 暗角
+    this.vignetteTex('vig',DW,DH,'rgba(0,0,0,0)','rgba(3,5,7,0.72)',0.46);
+    // r22: BOSS phase 专属暗角(红 phase2 / 紫 phase3)
+    this.vignetteTex('vig_phase2', DW,DH, 'rgba(150,40,40,0)','rgba(180,30,20,0.55)', 0.36);
+    this.vignetteTex('vig_phase3', DW,DH, 'rgba(120,30,180,0)','rgba(140,20,200,0.60)', 0.30);
+    this.vignetteTex('dmgvig',DW,DH,'rgba(120,0,0,0)','rgba(150,10,10,0.55)',0.30);
+    // 雾带
+    this.gradTex('fog',DW,200,'rgba(190,205,210,0.0)','rgba(200,212,216,0.55)');
+    // 枪(MG 剪影)
+    this.gunTex();
+  }
+  radialTex(key,w,h,stops){ const t=this.textures.createCanvas(key,w,h),c=t.getContext();
+    const gr=c.createRadialGradient(w/2,h/2,0,w/2,h/2,w/2); stops.forEach(s=>gr.addColorStop(s[0],s[1]));
+    c.fillStyle=gr; c.fillRect(0,0,w,h); t.refresh(); }
+  vignetteTex(key,w,h,inner,outer,innerStop){ const t=this.textures.createCanvas(key,w,h),c=t.getContext();
+    const gr=c.createRadialGradient(w/2,h/2,Math.min(w,h)*innerStop,w/2,h/2,Math.max(w,h)*0.62);
+    gr.addColorStop(0,inner); gr.addColorStop(1,outer); c.fillStyle=gr; c.fillRect(0,0,w,h); t.refresh(); }
+  gradTex(key,w,h,top,bot){ const t=this.textures.createCanvas(key,w,h),c=t.getContext();
+    const gr=c.createLinearGradient(0,0,0,h); gr.addColorStop(0,top); gr.addColorStop(1,bot); c.fillStyle=gr; c.fillRect(0,0,w,h); t.refresh(); }
+  gunTex(){ const w=520,h=200,t=this.textures.createCanvas('gun',w,h),c=t.getContext();
+    c.clearRect(0,0,w,h);
+    // 机枪护木 + 枪管(剪影,带高光)
+    c.fillStyle='#14181a';
+    c.beginPath(); c.moveTo(150,h); c.lineTo(230,70); c.lineTo(300,70); c.lineTo(300,h); c.closePath(); c.fill(); // 枪托
+    c.fillRect(250,86,40,h-86);
+    c.fillStyle='#1b2023'; c.fillRect(255,40,22,70);          // 枪机
+    c.fillStyle='#0d1012'; c.fillRect(262,2,12,52);           // 枪管
+    c.fillStyle='#23292c'; c.fillRect(258,52,20,8);           // 准星座
+    // 手(握把)
+    c.fillStyle='#9b7b58'; c.beginPath(); c.ellipse(300,150,34,26,-0.3,0,Math.PI*2); c.fill();
+    c.fillStyle='#7d6044'; c.beginPath(); c.ellipse(232,168,30,22,0.2,0,Math.PI*2); c.fill();
+    // 边缘高光
+    c.strokeStyle='rgba(180,190,195,0.25)'; c.lineWidth=2; c.beginPath(); c.moveTo(262,4); c.lineTo(262,52); c.stroke();
+    t.refresh(); }
+
+  /* ---------- HUD ---------- */
+  buildHUD(){
+    const F={fontFamily:'"Oswald",sans-serif'};
+    this.hudScore = this.add.text(24,18,'00000',{...F,fontSize:'30px',fontStyle:'600',color:'#e7e6df'}).setDepth(90);
+    this.add.text(24,54,'SCORE',{...F,fontSize:'12px',color:'#9aa3a0'}).setDepth(90).setLetterSpacing?.(2);
+    this.hudWave = this.add.text(DW/2,20,'Wave 1',{fontFamily:'"Black Ops One"',fontSize:'26px',color:'#d8b15a'}).setOrigin(0.5,0).setDepth(90);
+    this.hudCombo = this.add.text(DW/2,56,'',{...F,fontSize:'16px',fontStyle:'600',color:'#ff8c52'}).setOrigin(0.5,0).setDepth(90);
+    // r26: 连击徽章(combo>=5 显)— 大字 ×N + 衰减进度环 + 倍率
+    this.comboBadge = this.add.container(DW/2, 130).setDepth(91).setVisible(false);
+    this.comboBadgeBg = this.add.circle(0,0,46,0x1a0d0c,0.7).setStrokeStyle(3,0xd8b15a);
+    this.comboBadgeRing = this.add.graphics();
+    this.comboBadgeNum = this.add.text(0,-4,'×0',{fontFamily:'"Black Ops One"',fontSize:'28px',color:'#fff4cc',stroke:'#3a0a0a',strokeThickness:3}).setOrigin(0.5);
+    this.comboBadgeMul = this.add.text(0,22,'+50%',{fontFamily:'"Oswald"',fontSize:'10px',color:'#d8b15a',fontStyle:'600'}).setOrigin(0.5);
+    this.comboBadgeMul.setLetterSpacing && this.comboBadgeMul.setLetterSpacing(2);
+    this.comboBadge.add([this.comboBadgeBg, this.comboBadgeRing, this.comboBadgeNum, this.comboBadgeMul]);
+    // 碉堡血条
+    this.add.text(DW-26,16,'BUNKER INTEGRITY',{...F,fontSize:'12px',color:'#9aa3a0'}).setOrigin(1,0).setDepth(90);
+    this.hpBack = this.add.rectangle(DW-26,52,260,16,0x1a0d0c).setOrigin(1,0).setDepth(90).setStrokeStyle(2,0x000000);
+    this.hpFill = this.add.rectangle(DW-26-258,54,256,12,0x5fae6a).setOrigin(0,0).setDepth(91);
+    // 弹药
+    this.hudWeapon = this.add.text(DW-26,DH-88,'MG-42 Machine Gun',{fontFamily:'"Black Ops One"',fontSize:'16px',color:'#d8b15a'}).setOrigin(1,1).setDepth(90);
+    // r24: 武器图标条(右下 hudWeapon 上方,4 块 36×30 + 数字键标 + 当前金边)
+    const ICONS=['MG','SG','SR','FL'];                                  // 缩写图标(MG-42/Shotgun/SniperRifle/Flamer)
+    this.hudWBoxes=[]; this.hudWLabels=[];
+    for(let i=0;i<4;i++){
+      const x=DW-26-(4-i-1)*44-30, y=DH-118;
+      const r=this.add.rectangle(x,y,38,30,0x1a160c,0.85).setOrigin(0.5,0.5).setDepth(89).setStrokeStyle(2,0x4a3a1c);
+      const ic=this.add.text(x,y-1,ICONS[i],{fontFamily:'"Black Ops One"',fontSize:'13px',color:'#9aa3a0'}).setOrigin(0.5).setDepth(90);
+      const num=this.add.text(x+15,y-12,(i+1).toString(),{fontFamily:'"Black Ops One"',fontSize:'8px',color:'#d8b15a'}).setOrigin(0.5).setDepth(91);
+      this.hudWBoxes.push(r); this.hudWLabels.push(ic);
+    }
+    this.hudAmmo = this.add.text(DW-26,DH-46,'180 / 180',{...F,fontSize:'26px',fontStyle:'600',color:'#e7e6df'}).setOrigin(1,1).setDepth(90);
+    this.hudAmmoLbl = this.add.text(DW-26,DH-18,'AMMUNITION',{...F,fontSize:'12px',color:'#9aa3a0'}).setOrigin(1,1).setDepth(90);
+    this.ammoBack = this.add.rectangle(DW-26,DH-58,210,6,0x1a160c).setOrigin(1,0.5).setDepth(90);
+    this.ammoFill = this.add.rectangle(DW-26-208,DH-58,206,4,0xd8b15a).setOrigin(0,0.5).setDepth(91);
+    // 中央波次提示
+    this.banner = this.add.text(DW/2,170,'',{fontFamily:'"Black Ops One"',fontSize:'46px',color:'#f0e6c8'}).setOrigin(0.5).setDepth(92).setAlpha(0);
+    this.banner.setShadow(0,4,'rgba(0,0,0,0.7)',8);
+    // —— 顶部关卡进度条(细金条 + LEVEL 标签) ——
+    this.levelBarBack=this.add.rectangle(20,4,DW-40,3,0x1a160c,1).setOrigin(0,0).setDepth(89);
+    this.levelBarFill=this.add.rectangle(20,4,0,3,0xd8b15a,1).setOrigin(0,0).setDepth(90);
+    this.levelBarTxt=this.add.text(DW/2,10,'',{...F,fontSize:'10px',color:'#9aa3a0'}).setOrigin(0.5,0).setDepth(90);
+    // —— Reload 圆环 ——
+    this.reloadRing=this.add.graphics().setDepth(89).setVisible(false);
+    this.reloadRingTxt=this.add.text(DW/2,DH-128,'RELOADING',{fontFamily:'"Black Ops One"',fontSize:'13px',color:'#d8b15a'}).setOrigin(0.5).setDepth(89).setVisible(false);
+    // —— Damage Boost 角标(右上,×2 倒计时) ——
+    this.boostBadge=this.add.rectangle(DW-26,86,90,26,0xc23a3a,0.85).setOrigin(1,0).setDepth(90).setVisible(false).setStrokeStyle(2,0xffd24a);
+    this.boostBadgeTxt=this.add.text(DW-71,99,'×2 6.0s',{fontFamily:'"Black Ops One"',fontSize:'13px',color:'#fff4cc'}).setOrigin(0.5).setDepth(91).setVisible(false);
+    // —— BOSS HP 条(屏幕顶部下方居中,activeBoss 存在时显示)——
+    // r22: BOSS HUD 仪式重做 — 大字 name + APEX THREAT 副标 + 14px 厚血条 + 1/3·2/3 刻度
+    this.bossHpName=this.add.text(DW/2,46,'',{fontFamily:'"Black Ops One"',fontSize:'22px',color:'#fff4cc',stroke:'#3a0a0a',strokeThickness:3}).setOrigin(0.5,0).setDepth(92).setVisible(false);
+    this.bossHpName.setLetterSpacing && this.bossHpName.setLetterSpacing(4);
+    this.bossHpSub=this.add.text(DW/2,74,'APEX THREAT',{fontFamily:'"Oswald"',fontSize:'10px',color:'#d8b15a',fontStyle:'300'}).setOrigin(0.5,0).setDepth(92).setVisible(false);
+    this.bossHpSub.setLetterSpacing && this.bossHpSub.setLetterSpacing(6);
+    this.bossHpBack=this.add.rectangle(DW/2,92,720,22,0x1a0d0c,1).setOrigin(0.5,0).setDepth(92).setStrokeStyle(2,0xc23a3a).setVisible(false);
+    this.bossHpFill=this.add.rectangle(DW/2-358,96,716,14,0xff3a2a,1).setOrigin(0,0).setDepth(93).setVisible(false);
+    this.bossHpTicks=this.add.graphics().setDepth(94).setVisible(false);
+    this.bossHpTicks.fillStyle(0xfff4cc,0.6);
+    [0.33,0.66].forEach(p=>this.bossHpTicks.fillRect(DW/2-358+716*p-1,96,2,14));
+    // —— 屏边连击脉冲层(combo>=5/10/15 闪)——
+    this.edgePulse=this.add.graphics().setDepth(70).setBlendMode('ADD').setAlpha(0);
+    this.edgePulse.fillGradientStyle(0xff3a2a,0xff3a2a,0,0,1,1);
+    const PW=80;
+    this.edgePulse.fillRect(0,0,PW,DH); this.edgePulse.fillRect(DW-PW,0,PW,DH);     // 左右两条
+    this.edgePulse.fillRect(0,0,DW,PW*0.55); this.edgePulse.fillRect(0,DH-PW*0.55,DW,PW*0.55); // 上下两条
+  }
+  drawReloadRing(progress){
+    const g=this.reloadRing; g.clear();
+    const cx=DW/2, cy=DH-100, R=28;
+    g.lineStyle(4,0x1a0d0c,0.85); g.strokeCircle(cx,cy,R);
+    g.lineStyle(4,0xd8b15a,0.95);
+    g.beginPath(); g.arc(cx,cy,R,-Math.PI/2,-Math.PI/2+Math.PI*2*progress,false); g.strokePath();
+    g.fillStyle(0xd8b15a,0.18); g.fillCircle(cx,cy,R-4);
+  }
+
+  resetState(){
+    this.state='title';
+    this.bunkerHP=100; this.maxHP=100;
+    this.score=0; this.wave=0; this.kills=0; this.combo=0; this.comboT=0;
+    if(this.comboBadge) this.comboBadge.setVisible(false);
+    if(this.comboBadgeRing) this.comboBadgeRing.clear();
+    // r27: drought protection 计数 + critical-HP alarm 复位
+    this._dropMiss = {ammo:0, heal:0};
+    if(this.critVig) this.critVig.setAlpha(0);
+    if(this.hpFill) this.hpFill.scaleY = 1;
+    if(this.hpBack) this.hpBack.setStrokeStyle(2, 0x000000);
+    this._lastHBT = 0;
+    this.level=1; this.waveInLevel=0;                            // 10 关结构
+    this.chapterStats=[]; this.levelStartTime=0; this.levelStartKills=0; this.levelStartScore=0;  // r25 战绩
+    this.weaponIdx=0; this.wAmmo={}; WEAPONS.forEach(w=>this.wAmmo[w.id]=w.clip);
+    this.reloading=false; this.reloadT=0; this.cooldown=0;
+    this.syncWeapon();
+    this.sceneIdx=0; if(this.bgImg){ const b=this.bgImg; b.setTexture('bg'); const sc=Math.max(DW/b.width,DH/b.height); b.setScale(sc); b.setTint(SCENES[0].tint); }
+    this.betweenWave=true; this.waveTimer=2.2;
+    this.spawnQ=[]; this.spawnT=0; this.waveActive=false;
+    this.zombies.forEach(z=>{ z.shadow&&z.shadow.destroy(); z.spr.destroy(); }); this.zombies=[];
+    this.roarBusy=0; this.slowmoT=0; this.slowmoCD=0; this.boostTimer=0; this.activeBoss=null; this._phaseFreeze=0;
+    if(this.phaseVig)this.phaseVig.setAlpha(0);
+    const _bb=document.getElementById('bossBgm'); _bb&&_bb.pause();
+    if(this.slowVig)this.slowVig.setAlpha(0);
+    this.best=+(localStorage.getItem('nbs2_best')||0);
+    this.hideEpigraph && this.hideEpigraph();   // r28 Pick B: 章节引言板复位
+  }
+
+  bindInput(){
+    this.input.on('pointermove',p=>{ this.cross.setPosition(p.x,p.y); });
+    this.input.on('pointerdown',p=>{ AudioFX.shot && 0; this.cross.setPosition(p.x,p.y); this.firing=true; if(this.state==='play')this.tryFire(); });
+    this.input.on('pointerup',()=>{ this.firing=false; });
+    this.input.keyboard.on('keydown-R',()=>this.reload());
+    this.input.keyboard.on('keydown-P',()=>{ if(this.state==='play')this.showPauseMenu(); else if(this.state==='pause')this.hidePauseMenu(); });
+    this.input.keyboard.on('keydown-ESC',()=>{ if(this.state==='play')this.showPauseMenu(); else if(this.state==='pause')this.hidePauseMenu(); });
+    this.input.keyboard.on('keydown-SPACE',()=>{ if(this.state==='play')this.tryFire(); });
+    // 武器切换:数字键 1-4 / 滚轮
+    ['ONE','TWO','THREE','FOUR'].forEach((kc,i)=>this.input.keyboard.on('keydown-'+kc,()=>{ if(this.state==='play')this.switchWeapon(i); }));
+    this.input.on('wheel',(p,go,dx,dy)=>{ if(this.state!=='play')return; this.switchWeapon((this.weaponIdx+(dy>0?1:WEAPONS.length-1))%WEAPONS.length); });
+  }
+
+  startGame(){ this.resetState(); this.state='play'; AudioFX.wave();
+    const tb=document.getElementById('titleBgm'); tb&&tb.pause();
+    const bb=document.getElementById('battleBgm');                          // Lyria 真·管弦乐战斗 BGM
+    if(bb){ bb.volume=0.55; bb.currentTime=0; bb.play().catch(()=>AudioFX.startBGM()); } else AudioFX.startBGM();
+    document.getElementById('title').classList.add('hidden'); document.getElementById('over').classList.add('hidden');
+    // 开场展示 Chapter I 卡 1.6s,期间冻结刷怪
+    this.state='chapter'; this.betweenWave=true; this.waveTimer=99;
+    this.showChapterCard();
+    this.time.delayedCall(1600,()=>{ this.hideChapterCard();
+      // r28 Pick B: chapter card → epigraph(3.2s/1.8s)→ play
+      this.showEpigraph(this.level).then(()=>{
+        if(this.state==='title'||this.state==='over')return;   // quit 中途守卫
+        this.state='play'; this.waveTimer=1.6;
+        this.showEisenLine(EISEN_LINES.chapter[this.level]);
+        this.levelStartTime=this.time.now; this.levelStartKills=this.kills; this.levelStartScore=this.score;
+      });
+    });
+  }
+
+  /* ---------- 波次 ---------- */
+  startWave(){
+    this.wave++; this.waveInLevel++; this.waveActive=true; this.betweenWave=false;
+    if(this.waveInLevel===1) this.switchToChapterScene();        // 每关首波 = 按章节切场景
+    // 5 分钟通关节奏:波数小、密度足、推进快
+    const L=this.level, W=this.waveInLevel;
+    const isBossWave = (W===this.wavesForLevel(L)) && (L===5 || L===10);
+    const isFinalPush = (W===this.wavesForLevel(L)) && !isBossWave;             // 关末非 BOSS = micro-climax
+    // 三段式难度:教学 L1-3 / 中段 L4-7 / 高潮 L8-10
+    const n = isBossWave ? 3
+      : L<=3 ? (4 + W*1)              // 教学:5/6/7
+      : L<=7 ? (7 + W*1)              // 中段:8/9/10
+      : (10 + W*2);                   // 高潮:12/14/16
+    const intervalMul = isFinalPush ? 0.7 : 1.0;                                // FINAL PUSH 压 30% spawn 间隔
+    this.spawnQ=[];
+    for(let i=0;i<n;i++){
+      let t='soldier'; const r=Math.random();
+      if(L>=2 && r<0.22) t='runner';
+      if(L>=4 && r>=0.50 && r<0.58) t='spitter';
+      if(L>=4 && r>=0.66 && r<0.76) t='exploder';
+      if(L>=4 && r>=0.76 && r<0.86) t='elite';
+      if(L>=8 && r>=0.86 && r<0.93) t='armored';
+      if(L>=8 && r>=0.93) t='brute';
+      this.spawnQ.push({ t, delay:i*rnd(0.25,0.55)*intervalMul });
+    }
+    // FINAL PUSH 强制塞精英(L<=4 一个 elite, L>=5 一个 elite + 一个 armored)
+    if(isFinalPush){
+      this.spawnQ.push({ t:'elite', delay:n*rnd(0.25,0.45)*intervalMul });
+      if(L>=5) this.spawnQ.push({ t:'armored', delay:(n+1)*rnd(0.25,0.45)*intervalMul });
+      this.time.delayedCall(80,()=>{ this.showBanner('⚠ FINAL PUSH ⚠');
+        if(this.edgePulse){ this.edgePulse.setAlpha(0); this.tweens.add({targets:this.edgePulse,alpha:0.55,duration:240,yoyo:true,hold:200,repeat:2,onComplete:()=>this.edgePulse.setAlpha(0)}); }
+      });
+    }
+    this.spawnT=0;
+    this.showBanner('SECTOR '+this.level+' · WAVE '+this.waveInLevel+'/'+this.wavesForLevel(this.level)); AudioFX.wave();
+    // BOSS 触发:关 5 末波=tidelord,关 10 末波=leviathan
+    const lastWave = this.waveInLevel === this.wavesForLevel(this.level);
+    if(lastWave && (this.level===5 || this.level===10)){
+      const bossType = this.level===10?'leviathan':'tidelord';
+      this.time.delayedCall(1100,()=>this.spawnBoss(bossType));
+    }
+  }
+  spawnBoss(type){
+    this.spawn(type); const z=this.zombies[this.zombies.length-1];
+    z.x0=DW*0.5; z.emerge=0;                                                     // BOSS 中央登场
+    this.activeBoss = z;
+    this.showBanner('☠ '+z.cfg.bossName+' ☠');
+    this.cameras.main.shake(700,0.015); AudioFX.bossRoar(type, DW/2); AudioFX.thunder();
+    const bb=document.getElementById('battleBgm'), boss=document.getElementById('bossBgm');
+    if(boss && bb){ AudioFX.bgmCrossfade(bb, boss, bb.volume, 0.62, 600); }
+    else if(boss){ boss.volume=0.62; boss.currentTime=0; boss.play().catch(()=>{}); }
+    this.time.delayedCall(1100,()=>this.showEisenLine(EISEN_LINES.bossEntrance[type]));
+  }
+  wavesForLevel(L){ return [0,1,1,2,2,2,2,2,2,3,3][L]||2; }      // 总20波 · 5分钟通关节奏
+  showBanner(txt){ this.banner.setText(txt).setAlpha(0);
+    this.tweens.add({targets:this.banner,alpha:1,duration:300,yoyo:true,hold:1100,onComplete:()=>this.banner.setAlpha(0)}); }
+  // —— 10 关进度 / 胜利过场 / 奖励 ——
+  onWaveCleared(){
+    if(this.waveInLevel >= this.wavesForLevel(this.level)){
+      if(this.level>=10) this.finalVictory(); else this.levelComplete();
+    } else {
+      this.betweenWave=true; this.waveTimer=rnd(1.4,2.2);                          // 短整备 5分钟通关
+      this.showBanner('WAVE CLEARED'); if(Math.random()<.7)this.dropSupply();
+    }
+  }
+  levelComplete(){ this.state='cutscene'; AudioFX.wave(); AudioFX.levelStinger && AudioFX.levelStinger();
+    // r25: 记本章战绩(time/kills/score)
+    const t=Math.max(0.5,((this.time.now-(this.levelStartTime||0))/1000));
+    this.chapterStats=this.chapterStats||[];
+    this.chapterStats.push({lv:this.level, time:t, kills:this.kills-(this.levelStartKills||0), score:this.score-(this.levelStartScore||0)});
+    const bonus=this.level*250; this.score+=bonus;                                  // 奖励:分数
+    WEAPONS.forEach(w=>this.wAmmo[w.id]=w.clip); this.ammo=this.weapon().clip; this.reloading=false;  // 弹药全补
+    this.bunkerHP=clamp(this.bunkerHP+30,0,this.maxHP);                              // 碉堡修复
+    const bb=document.getElementById('battleBgm'); bb&&bb.pause();
+    this.showCutscene(false,bonus);
+    this.time.delayedCall(4000,()=>{                                                // 4s 过场(5分钟通关)
+      this.hideCutscene(); this.level++; this.waveInLevel=0; this.betweenWave=true; this.waveTimer=99; this.state='chapter';
+      const b2=document.getElementById('battleBgm'); b2&&b2.play().catch(()=>{});    // BGM 切换不阻塞
+      // 章节预告卡 1.6s → r28 Pick B 引言板 3.2s/1.8s → play
+      this.showChapterCard();
+      this.time.delayedCall(1600,()=>{ this.hideChapterCard();
+        this.showEpigraph(this.level).then(()=>{
+          if(this.state==='title'||this.state==='over')return;
+          this.state='play'; this.waveTimer=1.4;
+          this.showEisenLine(EISEN_LINES.chapter[this.level]);
+          this.levelStartTime=this.time.now; this.levelStartKills=this.kills; this.levelStartScore=this.score;
+        });
+      });
+    });
+  }
+  finalVictory(){ this.state='cutscene';
+    // r25: 收 L10 战绩 + 总耗时
+    const t=Math.max(0.5,((this.time.now-(this.levelStartTime||0))/1000));
+    this.chapterStats=this.chapterStats||[];
+    this.chapterStats.push({lv:this.level, time:t, kills:this.kills-(this.levelStartKills||0), score:this.score-(this.levelStartScore||0)});
+    if(this.score>this.best){ this.best=this.score; localStorage.setItem('nbs2_best',this.best); }
+    const bb=document.getElementById('battleBgm'); bb&&bb.pause(); AudioFX.stopBGM();
+    const vm=document.getElementById('victoryBgm'); if(vm){ vm.volume=0.62; vm.currentTime=0; vm.play().catch(()=>{}); }
+    this.showCutscene(true,0);
+    this.time.delayedCall(2200,()=>this.showEisenLine(EISEN_LINES.finalVictory));
+  }
+  showCutscene(isFinal,bonus){ const ov=document.getElementById('cutscene'), vid=document.getElementById('cutsceneVid');
+    document.getElementById('title').classList.add('hidden'); document.getElementById('over').classList.add('hidden');  // 防遮罩叠加
+    const rank=this.kills>=180?'S':this.kills>=120?'A':this.kills>=70?'B':'C';
+    document.getElementById('cutTitle').innerHTML = isFinal? 'The Cape · <span class="accent">SECURED</span>' : ('Sector '+this.level+' · Line Held');
+    document.getElementById('cutSubLabel').textContent = isFinal? 'VICTORY · THE LAST CAPE STANDS' : ('SECTOR '+this.level+' SECURED');
+    // r25: 终局战绩柱图(每章耗时归一化到最长章)
+    let statsHtml='';
+    if(isFinal && this.chapterStats && this.chapterStats.length){
+      const maxT=Math.max.apply(null, this.chapterStats.map(s=>s.time));
+      const totalT=this.chapterStats.reduce((a,b)=>a+b.time,0);
+      const rows=this.chapterStats.map(s=>{
+        const w=Math.max(6, Math.round(s.time/maxT*100));
+        return '<div style="display:flex;align-items:center;gap:8px;margin:2px 0;font-family:Oswald,sans-serif;font-size:12px;color:#c3c8c4">'+
+          '<span style="width:32px;text-align:right;color:#9aa3a0">S'+s.lv+'</span>'+
+          '<span style="height:8px;background:'+(s.lv===5||s.lv===10?'#a01e1e':'#d8b15a')+';width:'+w+'%;max-width:240px;border-radius:1px"></span>'+
+          '<span style="width:48px;color:#fff4cc">'+s.time.toFixed(1)+'s</span>'+
+          '<span style="width:42px;color:#9aa3a0">'+s.kills+'k</span>'+
+        '</div>';
+      }).join('');
+      statsHtml = '<div style="margin-top:14px;padding:10px 16px;background:rgba(8,12,14,.55);border:1px solid rgba(216,177,90,.3);max-width:520px;margin-left:auto;margin-right:auto;text-align:left">'+
+        '<div style="font-family:Oswald,sans-serif;font-size:10px;letter-spacing:4px;color:#d8b15a;text-align:center;margin-bottom:6px">CHAPTER LOG · '+totalT.toFixed(1)+'s TOTAL</div>'+rows+'</div>';
+    }
+    document.getElementById('cutSub').innerHTML = isFinal
+      ? ('All 10 sectors cleared · Rank <b style="color:#d8b15a;font-size:1.5em">'+rank+'</b><br>Score '+this.score+' · Kills '+this.kills+' · Medal ★ Shield of the Cape'+statsHtml)
+      : ('Bonus +'+bonus+' · Ammo Refilled · Bunker Repaired +30');
+    document.getElementById('cutBtn').style.display = isFinal? 'inline-block':'none';
+    // 关卡过场:BOSS 前关用 BOSS 专属 CG (level 转到 5/10 之前的最后一关 = 4/9 通关时),其余轮播
+    const pool=['cut-dawn','cut-mid','cut-charge','victory-clip'];
+    let cut;
+    if(this.level===4) cut='cut-boss5';      // 通过关 4 → 进关 5 BOSS,播 Tidelord 觉醒
+    else if(this.level===9) cut='cut-boss10'; // 通过关 9 → 进关 10 BOSS,播 Leviathan 浮现
+    else cut=pool[(this.level-1)%pool.length];
+    const src = isFinal? 'assets/cutscene/final-victory.mp4' : ('assets/cutscene/'+cut+'.mp4');
+    if(vid){ vid.src=src; vid.loop=isFinal; vid.currentTime=0; vid.play().catch(()=>{}); }
+    ov.classList.remove('hidden');
+  }
+  hideCutscene(){ const ov=document.getElementById('cutscene'), vid=document.getElementById('cutsceneVid'); ov.classList.add('hidden'); if(vid)vid.pause(); }
+
+  spawn(type, opts){
+    const cfg=TYPES[type];
+    const x = (opts && opts.x!=null) ? opts.x : rnd(DW*0.16,DW*0.84);
+    // r25: 出水预告 — 杂兵 spawn 前 0.36s 海面冒涟漪+黑潮汽气(BOSS/已预告/强制位置时跳过)
+    if(!cfg.boss && !(opts && opts.skipTell)){
+      this.spawnTell(x); this.time.delayedCall(360, ()=>this.spawn(type, {x, skipTell:true})); return;
+    }
+    let spr, animated=false;
+    // r28: Leviathan 用 sprite sheet 8 帧动画(替代静态 image)
+    if(type==='leviathan' && this.textures.exists('z_boss_leviathan_anim')){
+      spr=this.add.sprite(x, HORIZON_Y, 'z_boss_leviathan_anim', 0).setOrigin(0.5,1).setTint(cfg.tint);
+    } else if(cfg.walkKey && this.anims.exists(cfg.walkAnim)){
+      spr=this.add.sprite(x, HORIZON_Y, cfg.walkKey).setOrigin(0.5,1);
+      spr.play(cfg.walkAnim); spr.anims.setProgress(Math.random()); spr.setTint(cfg.tint); animated=true;  // 错开相位
+    } else {
+      const tx=this.textures.exists(cfg.tex)?cfg.tex:'z_soldier';
+      spr=this.add.image(x, HORIZON_Y, tx).setOrigin(0.5,1).setTint(cfg.tint);
+    }
+    const z={ spr, type, cfg, p:0, hp:cfg.hp, maxhp:cfg.hp, x0:x, step:rnd(0,6.28),
+              atkT:0, dead:false, emerge:1, animated, roared:false, _pulsing:false, _sxNow:1, _syNow:1, shadow:null,
+              // r28: leviathan sprite cell 360 内容居中带 padding,需补偿到原贴图视效
+              _scaleBoost: (type==='leviathan' && this.textures.exists('z_boss_leviathan_anim')) ? 2.0 : 1 };
+    this.addSeparationFX(z, x);
+    spr.setData('z',z);
+    this.zombies.push(z);
+  }
+  // r25: 出水预告 — 海面短暂涟漪 + 黑潮汽气
+  spawnTell(x){
+    const y = HORIZON_Y + 6;
+    // 涟漪扩散环(2 圈错开)
+    for(let i=0;i<2;i++){
+      const r = this.add.ellipse(x, y, 10, 4, 0xbcd4e0, 0.85).setOrigin(0.5).setDepth(48).setBlendMode('SCREEN').setStrokeStyle(1.5,0xdfe8f0,0.9);
+      this.tweens.add({targets:r, scaleX:6, scaleY:5, alpha:0, duration:520, delay:i*120, ease:'Cubic.easeOut', onComplete:()=>r.destroy()});
+    }
+    // 黑潮汽气 — 暗紫垂直雾上升
+    this.tideFog && this.tideFog.emitParticleAt(x, y-2, 4);
+    // 海浪白花
+    this.seaSplash && this.seaSplash.emitParticleAt(x, y, 3);
+    // 短促低频"咕嘟"声(用 hit + 低频 tone 表示水下气泡)
+    AudioFX.hit && AudioFX.hit();
+  }
+  // r28: Leviathan 8 帧行为机 — baseline idle 切 0/1(phase1)或 7/0(phase2 rage),hurt/slash/roar 短暂 override
+  updateBossAnim(z){
+    if(z.type!=='leviathan' || !z.spr || !z.spr.setFrame) return;
+    const now = this.time.now;
+    // phase 切换检测(hp<50%)→ 强制 frame 7 持留 1500ms
+    const phaseNow = (z.hp < z.maxhp * 0.5) ? 2 : 1;
+    if(phaseNow === 2 && z._bossPhase !== 2){
+      z._bossPhase = 2;
+      z._bossOverrideFrame = 7;
+      z._bossOverrideUntil = now + 1500;
+    }
+    // override 短暂动作优先(hurt/slash/roar/phase2-entry)
+    if(now < (z._bossOverrideUntil||0)){
+      z.spr.setFrame(z._bossOverrideFrame||0);
+      return;
+    }
+    // baseline 呼吸:phase1 = 0/1 交替(700ms),phase2 = 7/0 交替(更激进 500ms)
+    const period = z._bossPhase===2 ? 500 : 700;
+    const flip = (Math.floor(now / period) % 2 === 0);
+    if(z._bossPhase === 2){
+      z.spr.setFrame(flip ? 7 : 0);
+    } else {
+      z.spr.setFrame(flip ? 0 : 1);
+    }
+  }
+  bossLevHurt(z){
+    if(z.type!=='leviathan' || !z.spr || !z.spr.setFrame) return;
+    z._bossOverrideFrame = 6;
+    z._bossOverrideUntil = this.time.now + 220;
+  }
+  bossLevSlash(z){
+    if(z.type!=='leviathan' || !z.spr || !z.spr.setFrame) return;
+    z._slashSide = !z._slashSide;
+    z._bossOverrideFrame = z._slashSide ? 3 : 4;
+    z._bossOverrideUntil = this.time.now + 320;
+  }
+  bossLevRoar(z){
+    if(z.type!=='leviathan' || !z.spr || !z.spr.setFrame) return;
+    z._bossOverrideFrame = 2;
+    z._bossOverrideUntil = this.time.now + 420;
+  }
+  bossLevCharge(z){
+    if(z.type!=='leviathan' || !z.spr || !z.spr.setFrame) return;
+    z._bossOverrideFrame = 5;
+    z._bossOverrideUntil = this.time.now + 600;
+  }
+  addSeparationFX(z, x){ const spr=z.spr;
+    // 仅一层低调暗色外描边:把僵尸边缘从冷蓝杂乱背景里"抠"出来,不做卡通光环
+    if(spr.preFX){ spr.preFX.setPadding(6); spr.preFX.addGlow(0x05080a, 3, 0, false, 0.12, 10); }
+    z.shadow=this.add.ellipse(x, HORIZON_Y, 40, 12, 0x000000, 0.30).setDepth(9); }
+
+  /* ---------- 武器系统 ---------- */
+  weapon(){ return WEAPONS[this.weaponIdx]; }
+  syncWeapon(){ const w=this.weapon(); this.clip=w.clip; this.fireRate=w.fireRate; this.reloadDur=w.reloadDur;
+    this.ammo=(this.wAmmo[w.id]!==undefined?this.wAmmo[w.id]:w.clip);
+    if(this.gun){ const tx=this.textures.exists(w.tex)?w.tex:'gun_fp'; this.gun.setTexture(tx); this.gun.setScale((DW*w.scaleW)/this.gun.width);
+      this.barrelLen=this.gun.displayHeight*0.9; }
+    if(this.hudWeapon)this.hudWeapon.setText(w.name);
+    // r24: 武器图标条高亮当前
+    if(this.hudWBoxes){
+      this.hudWBoxes.forEach((r,i)=>{ const on=i===this.weaponIdx;
+        r.setStrokeStyle(on?2:2, on?0xd8b15a:0x4a3a1c);
+        r.fillColor = on?0x3a2a14:0x1a160c;
+        this.hudWLabels[i].setColor(on?'#fff4cc':'#9aa3a0');
+      });
+    }
+  }
+  switchWeapon(idx){ if(idx<0||idx>=WEAPONS.length||idx===this.weaponIdx)return;
+    this.wAmmo[this.weapon().id]=this.ammo; this.reloading=false; this.reloadT=0; this.cooldown=0.12;
+    this.weaponIdx=idx; this.syncWeapon(); AudioFX.reload(); this.showBanner('▸ '+this.weapon().name); }
+
+  /* ---------- 场景管理器(每 3 波切换)---------- */
+  switchToChapterScene(){
+    const ch=CHAPTERS[this.level]; if(!ch)return;
+    const target=ch.sceneIdx; if(target===this.sceneIdx)return;
+    if(!this.textures.exists(SCENES[target].key))return;
+    if(!this.sceneFade)this.sceneFade=this.add.rectangle(DW/2,DH/2,DW,DH,0x05080a).setAlpha(0).setDepth(73);
+    const sc=SCENES[target]; this.sceneIdx=target;
+    this.tweens.add({targets:this.sceneFade,alpha:1,duration:380,yoyo:true,hold:220,
+      onYoyo:()=>{ const b=this.bgImg; b.setTexture(sc.key); const s=Math.max(DW/b.width,DH/b.height); b.setScale(s); b.setTint(sc.tint); }});
+  }
+  showChapterCard(){
+    const ch=CHAPTERS[this.level]; if(!ch)return;
+    document.getElementById('title').classList.add('hidden'); document.getElementById('over').classList.add('hidden'); document.getElementById('cutscene').classList.add('hidden');
+    document.getElementById('chapNum').textContent='CHAPTER';
+    document.getElementById('chapTitle').textContent=ch.name;
+    document.getElementById('chapSub').textContent=ch.sub;
+    document.getElementById('chapter').classList.remove('hidden');
+  }
+  hideChapterCard(){ document.getElementById('chapter').classList.add('hidden'); }
+  // r28 Pick B: 3.2s/1.8s 电影引言板 — 返 Promise, 串行接 showChapterCard 后
+  showEpigraph(level, mode){
+    const ep=(typeof EPIGRAPHS!=='undefined')&&EPIGRAPHS[level]; const ov=document.getElementById('epigraph');
+    if(!ep||!ov) return Promise.resolve();
+    // 前 5 章 full(3.2s) / 后 5 章 brief(1.8s) · 节奏对应潮汐逼近
+    mode = mode || (level<=5 ? 'full' : 'brief');
+    const TIM = mode==='brief' ? { inMs:320, hold:1100, outMs:380 } : { inMs:480, hold:2200, outMs:520 };
+    document.getElementById('epiRoman').textContent = ep.roman;
+    document.getElementById('epiSub').textContent   = ep.sub;
+    document.getElementById('epiLede').textContent  = ep.quote;
+    // brief 模式: 通过 .brief class 让 CSS transition 缩短(也隐藏 lede/rule/stamp)
+    ov.classList.toggle('brief', mode==='brief');
+    ov.classList.remove('hidden');
+    // 强制 reflow 让 transition 生效(否则 remove hidden + add show 同帧无淡入)
+    void ov.offsetWidth;
+    ov.classList.add('show');
+    AudioFX.telegraphDit && AudioFX.telegraphDit();
+    // P0 修: 用 Phaser delayedCall + abort 标志,quit/reset/retry 可中断
+    if(this._epigraphHideEv){ this._epigraphHideEv.remove(false); this._epigraphHideEv=null; }
+    if(this._epigraphDoneEv){ this._epigraphDoneEv.remove(false); this._epigraphDoneEv=null; }
+    this._epigraphAbort = false;
+    return new Promise(resolve=>{
+      this._epigraphHideEv = this.time.delayedCall(TIM.inMs + TIM.hold, ()=>{
+        if(this._epigraphAbort){ resolve(); return; }
+        ov.classList.remove('show');
+        this._epigraphDoneEv = this.time.delayedCall(TIM.outMs + 40, ()=>{
+          ov.classList.add('hidden'); ov.classList.remove('brief');
+          resolve();
+        });
+      });
+    });
+  }
+  hideEpigraph(){
+    this._epigraphAbort = true;
+    if(this._epigraphHideEv){ this._epigraphHideEv.remove(false); this._epigraphHideEv=null; }
+    if(this._epigraphDoneEv){ this._epigraphDoneEv.remove(false); this._epigraphDoneEv=null; }
+    const ov=document.getElementById('epigraph'); if(!ov)return;
+    ov.classList.remove('show'); ov.classList.remove('brief'); ov.classList.add('hidden');
+  }
+  // —— Marshal Eisen 字幕系统 ——
+  showEisenLine(text){
+    if(!text)return;
+    const wrap=document.getElementById('eisenWrap'), el=document.getElementById('eisenLine');
+    if(!wrap||!el)return;
+    clearTimeout(this._eisenHideT); clearInterval(this._eisenTypeI);
+    el.textContent=''; wrap.style.opacity='1';
+    // 逐字打印 + 每字符电报机滴音(空格/标点不发音)
+    let i=0; const speed=42;                                                // ms/char
+    this._eisenTypeI=setInterval(()=>{
+      if(i>=text.length){ clearInterval(this._eisenTypeI);
+        this._eisenHideT=setTimeout(()=>{ wrap.style.opacity='0'; }, 2400);
+        return; }
+      const ch=text[i]; el.textContent += ch;
+      if(/\S/.test(ch) && (i%2===0)) AudioFX.telegraphDit && AudioFX.telegraphDit();
+      i++;
+    }, speed);
+  }
+  nextScene(){ let n=this.sceneIdx; for(let i=0;i<SCENES.length;i++){ n=(n+1)%SCENES.length; if(this.textures.exists(SCENES[n].key))break; }
+    if(n===this.sceneIdx)return; const sc=SCENES[n]; this.sceneIdx=n;
+    if(!this.sceneFade)this.sceneFade=this.add.rectangle(DW/2,DH/2,DW,DH,0x05080a).setAlpha(0).setDepth(73);
+    this.tweens.add({targets:this.sceneFade,alpha:1,duration:420,yoyo:true,hold:280,
+      onYoyo:()=>{ const b=this.bgImg; b.setTexture(sc.key); const s=Math.max(DW/b.width,DH/b.height); b.setScale(s); b.setTint(sc.tint); this.showBanner('▶ '+sc.name); }}); }
+
+  /* ---------- 怪物行为 ---------- */
+  explode(z){ if(z._exploded)return; z._exploded=true;
+    this.hurtBunker(40); this.cameras.main.shake(280,0.020); AudioFX.hurt();
+    this.bloods.emitParticleAt(z.spr.x, z.spr.getBounds().centerY, 60); this.dust.emitParticleAt(z.spr.x, FRONT_Y-60, 30);
+    this.score+=z.cfg.score; z.shadow&&z.shadow.destroy(); z.spr.destroy(); this.zombies=this.zombies.filter(q=>q!==z); }
+  spit(z){ const sx=z.spr.x, sy=z.spr.getBounds().top+10; const tx=clamp(DW*0.5+rnd(-140,140),120,DW-120), ty=DH-118;
+    const proj=this.add.image(sx,sy,'spark').setTint(0x9be84a).setScale(3.4).setDepth(70).setBlendMode('ADD');
+    this.tweens.add({targets:proj,x:tx,duration:900,ease:'Linear'});
+    this.tweens.add({targets:proj,y:Math.min(sy,ty)-170,duration:450,ease:'Quad.easeOut',yoyo:true,
+      onComplete:()=>{ proj.destroy(); this.hurtBunker(8); this.dust.emitParticleAt(tx,ty,12); }}); AudioFX.hit(z.spr.x); }
+  hitAt(px,py,w){ const HITBOX={ x:0.30, y:0.06, w:0.40, h:0.92 };
+    let hit=null, hitScore=Infinity;
+    for(const z of this.zombies){ if(z.dead)continue; const b=z.spr.getBounds(); const hx=b.x+b.width*HITBOX.x, hw=b.width*HITBOX.w, hy=b.y+b.height*HITBOX.y, hh=b.height*HITBOX.h; if(px>=hx&&px<=hx+hw&&py>=hy&&py<=hy+hh){ const cx=hx+hw/2, dx=px-cx, dy=py-(hy+hh/2); const sc=-z.p*1000+Math.hypot(dx,dy); if(sc<hitScore){ hit=z; hitScore=sc; } } }
+    if(hit){ const b=hit.spr.getBounds(); const hy=b.y+b.height*HITBOX.y, hh=b.height*HITBOX.h; const head=py<hy+hh*0.22; const dmg=(head?w.headMul:1)*w.dmg*((this.boostTimer||0)>0?2:1);
+      hit.hp-=dmg; (hit.cfg.boss?AudioFX.bossHit(hit.spr.x):AudioFX.hit(hit.spr.x));
+      // r28: Leviathan 命中触发 hurt 帧(替代 tint 闪)
+      if(hit.type==='leviathan') this.bossLevHurt(hit);
+      // r22: 分层血肉 — 沿弹道方向锥形喷射
+      const _ang=Math.atan2(py-this.muzzleY, px-this.muzzleX);
+      this.bloods.emitParticleAt(px,py, head?22:11);
+      this.clothShred.emitParticleAt(px+Math.cos(_ang)*8, py+Math.sin(_ang)*8, head?2:4);
+      if(head) this.fleshChunk.emitParticleAt(px,py,8);
+      hit.spr.setTintFill(0xffffff); this.time.delayedCall(40,()=>{ if(!hit.dead)hit.spr.setTint(hit.cfg.tint); });
+      this.dmgFloat(px+rnd(-8,8), py-6, dmg, head, hit.cfg && hit.cfg.boss);
+      if(head) AudioFX.headshot();         // r22: HEADSHOT 标签由 dmgFloat crit 内置,移除冗余 floatText
+      if(hit.hp<=0){ this.kill(hit,px,py);
+        if(head){ const slow=this.maybeHeadshotCam(px,py); if(!slow)this.miniHeadshotFx(px,py); } } }
+  }
+  dmgFloat(x,y,dmg,head,isBoss){
+    const showDmg=dmg>=1?Math.round(dmg):(Math.round(dmg*10)/10);
+    const tier = isBoss?'boss':(head?'crit':(dmg>=5?'heavy':'light'));
+    const STYLE={
+      light:{size:'18px',color:'#fff0d4',stroke:'#1a0d0c',sw:2,prefix:'',dx:rnd(-20,20)},
+      heavy:{size:'24px',color:'#ffd88a',stroke:'#3a1a0a',sw:3,prefix:'',dx:rnd(-26,26)},
+      crit:{size:'34px',color:'#fff4cc',stroke:'#a01e1e',sw:4,prefix:'◉ ',dx:rnd(-12,12)},
+      boss:{size:'28px',color:'#ff8c52',stroke:'#3a0a0a',sw:4,prefix:'◆ ',dx:rnd(-18,18)}
+    }[tier];
+    const t=this.add.text(x,y,STYLE.prefix+'-'+showDmg,{fontFamily:'"Black Ops One"',fontSize:STYLE.size,color:STYLE.color,stroke:STYLE.stroke,strokeThickness:STYLE.sw}).setOrigin(0.5).setDepth(86).setScale(0.3);
+    this.tweens.add({targets:t,scale:tier==='crit'?1.2:(tier==='boss'?1.05:0.9),duration:140,ease:'Back.easeOut'});
+    this.tweens.add({targets:t,x:x+STYLE.dx,y:y-rnd(70,95),angle:rnd(-8,8),alpha:0,duration:tier==='crit'?900:680,ease:'Cubic.easeOut',onComplete:()=>t.destroy()});
+    if(tier==='crit'){
+      const lbl=this.add.text(x+rnd(60,90),y-rnd(20,40),'HEADSHOT',{fontFamily:'"Oswald"',fontSize:'11px',color:'#ffd24a',fontStyle:'600'}).setOrigin(0.5).setDepth(86).setAlpha(0);
+      lbl.setLetterSpacing && lbl.setLetterSpacing(3);
+      this.tweens.add({targets:lbl,alpha:1,y:lbl.y-12,duration:160});
+      this.tweens.add({targets:lbl,alpha:0,duration:500,delay:400,onComplete:()=>lbl.destroy()});
+    }
+  }
+  miniHeadshotFx(x,y){
+    if(this.anims.exists('fx_skull')){ const sk=this.add.sprite(x,y,'fx_skull').setDepth(86).setScale(0.85).setBlendMode('ADD').setAlpha(0.95);
+      sk.play('fx_skull'); this.tweens.add({targets:sk,scale:1.15,alpha:0,duration:380,ease:'Cubic.easeOut',onComplete:()=>sk.destroy()}); }
+    this.gore.emitParticleAt(x,y,18); this.bloods.emitParticleAt(x,y,14);
+    this.cameras.main.shake(110,0.0045);
+  }
+  // r22 Pick#1: BOSS phase 视觉爆发包(同心冲击波+本体红光晕+phase 暗角+尘环+顿帧)
+  _bossPhaseFx(z, level){
+    // r30: Eisen portrait reactive flash(BOSS phase shift 时 portrait 红光 + 放大脉冲)
+    const p=document.getElementById('eisenPortrait');
+    if(p){ p.style.filter='drop-shadow(0 0 14px rgba(255,60,40,0.95)) contrast(1.25) saturate(1.4)'; p.style.transform='scale(1.10)';
+      setTimeout(()=>{ p.style.filter='drop-shadow(0 2px 6px rgba(0,0,0,.7)) contrast(1.08)'; p.style.transform='scale(1)'; }, level===2?900:600);
+    }
+    const bx=z.spr.x, by=z.spr.getBounds().centerY;
+    for(let i=0;i<2;i++){
+      const ring=this.add.circle(bx,by,16).setStrokeStyle(level===2?10:7, level===2?0xff3a2a:0xffaa3a, 0.9).setDepth(85).setBlendMode('ADD');
+      this.tweens.add({targets:ring, radius:level===2?520:360, alpha:0, duration:level===2?700:550, delay:i*120, ease:'Cubic.easeOut', onComplete:()=>ring.destroy()});
+    }
+    z.spr.setTintFill(level===2?0xff1a1a:0xff6a2a);
+    this.time.delayedCall(280, ()=>{ if(!z.dead) z.spr.setTint(z.cfg.tint); });
+    this.tweens.add({targets:z.spr, scaleX:z._sxNow*1.12, scaleY:z._syNow*1.12, duration:160, yoyo:true, ease:'Quad.easeOut'});
+    if(this.phaseVig){ this.phaseVig.setTexture(level===2?'vig_phase3':'vig_phase2');
+      this.tweens.killTweensOf(this.phaseVig);
+      this.tweens.add({targets:this.phaseVig, alpha: level===2?1.0:0.85, duration:400});
+    }
+    for(let k=0;k<12;k++){ const a=k/12*Math.PI*2, rx=bx+Math.cos(a)*60, ry=FRONT_Y-30+Math.sin(a)*8;
+      this.dust.emitParticleAt(rx, ry, 4); }
+    this.gore.emitParticleAt(bx, by, level===2?40:24);
+    this._phaseFreeze = 0.08;
+  }
+  maybeHeadshotCam(x,y){                                            // 随机触发 5s 慢动作击碎头颅
+    if(this.slowmoT>0 || this.slowmoCD>0) return false;
+    if(Math.random()>0.18) return false;
+    this.slowmoT=5; this.slowmoCD=20;
+    AudioFX.diveIn();                                                    // 音频沉浸:lowpass 600Hz + BGM duck + whoosh
+    if(this.anims.exists('fx_skull')){ const sk=this.add.sprite(x,y,'fx_skull').setDepth(86).setScale(2.3).setBlendMode('ADD'); sk.play('fx_skull');
+      this.tweens.add({targets:sk,scale:2.9,duration:900}); this.time.delayedCall(1400,()=>{ if(sk&&sk.active)sk.destroy(); }); }
+    this.gore.emitParticleAt(x,y,64); this.bloods.emitParticleAt(x,y,30);
+    if(this.slowVig){ this.slowVig.setAlpha(0); this.tweens.add({targets:this.slowVig,alpha:0.55,duration:350,yoyo:true,hold:4000}); }
+    this.cameras.main.shake(220,0.006);
+    this.showBanner('★ HEADSHOT KILL · SLOW-MO');
+    AudioFX.kill(x); AudioFX.hurt();
+    return true;
+  }
+  fireFlame(mx,my){ const cx=this.cross.x, cy=this.cross.y, ang=Math.atan2(cy-my,cx-mx), len=Math.min(620,Math.max(360,Math.hypot(cx-mx,cy-my)+150));
+    if(this.flameSpr && this.anims.exists('fx_flame')){           // 动画化真实火舌(长射流)
+      if(!this.flameSpr.visible || !this.flameSpr.anims.isPlaying)this.flameSpr.play('fx_flame');
+      this.flameSpr.setVisible(true).setPosition(mx,my).setRotation(ang+Math.PI/2);
+      const sy=len/300*1.28, sx=sy*rnd(0.5,0.66);
+      this.flameSpr.setScale(sx,sy).setAlpha(rnd(.85,1)); this._flameOnT=0.10;
+    } else {                                                       // 回退:程序化三角火焰
+      if(!this.flameGfx)this.flameGfx=this.add.graphics().setDepth(58).setBlendMode('ADD');
+      const g=this.flameGfx; g.clear();
+      for(let k=0;k<3;k++){ const sp=0.30-k*0.07, col=[0xff5a0a,0xff8c1a,0xffd24a][k], al=[0.20,0.28,0.46][k];
+        g.fillStyle(col,al); g.beginPath(); g.moveTo(mx,my);
+        g.lineTo(mx+Math.cos(ang-sp)*len*rnd(.8,1), my+Math.sin(ang-sp)*len*rnd(.8,1));
+        g.lineTo(mx+Math.cos(ang+sp)*len*rnd(.8,1), my+Math.sin(ang+sp)*len*rnd(.8,1));
+        g.closePath(); g.fillPath(); }
+      this.time.delayedCall(55,()=>this.flameGfx&&this.flameGfx.clear());
+    }
+    // 余烬火星(沿射流喷出,补体积感)
+    if(!this.embers)this.embers=this.add.particles(0,0,'spark',{lifespan:420,speed:{min:120,max:360},scale:{start:1.5,end:0},alpha:{start:.9,end:0},tint:[0xffe06a,0xff8c1a,0xff4a0a],blendMode:'ADD',emitting:false}).setDepth(60);
+    this.embers.emitParticleAt(mx+Math.cos(ang)*len*0.5, my+Math.sin(ang)*len*0.5, 2);
+    this.embers.emitParticleAt(mx+Math.cos(ang)*len*0.85, my+Math.sin(ang)*len*0.85, 1);
+    for(const z of this.zombies){ if(z.dead)continue; const b=z.spr.getBounds(); const zx=b.centerX, zy=b.centerY; const za=Math.atan2(zy-my,zx-mx), dd=Math.hypot(zx-mx,zy-my);
+      let da=Math.abs(za-ang); if(da>Math.PI)da=Math.PI*2-da;
+      if(dd<len && da<0.32){ z.hp-=this.weapon().dmg; if(!z.dead){ z.spr.setTintFill(0xff6a1a); this.time.delayedCall(40,()=>{ if(!z.dead)z.spr.setTint(z.cfg.tint); }); } if(z.hp<=0)this.kill(z,zx,zy); } } }
+
+  /* ---------- 射击 ---------- */
+  reload(){ if(this.state!=='play'||this.reloading||this.ammo>=this.clip)return; this.reloading=true; this.reloadT=this.reloadDur; AudioFX.reload(); }
+  tryFire(){
+    const w=this.weapon();
+    if(this.reloading||this.cooldown>0)return;
+    if(this.ammo<=0){ AudioFX.dry(); this.reload(); return; }
+    this.ammo--; this.cooldown=w.fireRate/1000; AudioFX[w.sfx](this.muzzleX);
+    const mx=this.muzzleX, my=this.muzzleY;
+    // 枪口火光(重后坐武器更大)
+    this.muzzle.setPosition(mx+rnd(-6,6), my).setVisible(true).setScale(rnd(.7,1.15)*(w.recoil>2?1.5:1)).setAngle(rnd(0,360)).setAlpha(1);
+    this.tweens.add({targets:this.muzzle,alpha:0,duration:w.recoil>2?100:70});
+    if(!w.flame && this.muzzleFx && this.anims.exists('fx_muzzle')){    // 动画化枪口闪光
+      this.muzzleFx.setPosition(mx,my).setVisible(true).setScale((w.recoil>2?1.25:0.85)*rnd(.85,1.15)).setAngle(rnd(0,360)).setAlpha(1).play('fx_muzzle');
+      this.muzzleFx.once('animationcomplete',()=>{ if(this.muzzleFx)this.muzzleFx.setVisible(false); }); }
+    this.recoil=w.recoil;
+    // r22: 枪口烟雾(重武器更多) + 弹壳从枪机抛出
+    this.muzzleSmoke && this.muzzleSmoke.emitParticleAt(mx+rnd(-4,4), my+rnd(-6,2), w.recoil>2?5:2);
+    this.shellEject && this.shellEject.emitParticleAt(this.gun.x+24, this.gun.y-this.barrelLen*0.45, 1);
+    this.cameras.main.shake(60, 0.0032*w.recoil);
+    if(w.flame){ this.fireFlame(mx,my); return; }                 // 火焰喷射器:锥形灼烧
+    // 弹丸(霰弹多发扇形)+ 可见直线弹道 + 命中
+    for(let i=0;i<w.pellets;i++){
+      const ox=w.pellets>1?rnd(-w.spread,w.spread):0, oy=w.pellets>1?rnd(-w.spread,w.spread):0;
+      const px=this.cross.x+ox, py=this.cross.y+oy;
+      this.addTracer(mx,my,px,py,w.recoil>2);
+      this.hitAt(px,py,w);
+    }
+  }
+  addTracer(x1,y1,x2,y2,heavy){                                    // 直线弹道:外发光+白热核心+飞行弹头
+    const g=this.add.graphics().setDepth(59).setBlendMode('ADD');
+    g.lineStyle(heavy?11:7, 0xff8c30, 0.32).lineBetween(x1,y1,x2,y2);
+    g.lineStyle(heavy?3.5:2, 0xfff4cc, 0.95).lineBetween(x1,y1,x2,y2);
+    this.tweens.add({targets:g,alpha:0,duration:160,onComplete:()=>g.destroy()});
+    const dot=this.add.image(x1,y1,'spark').setTint(0xfff4cc).setScale(heavy?3.2:2.2).setDepth(60).setBlendMode('ADD');
+    this.tweens.add({targets:dot,x:x2,y:y2,duration:55,onComplete:()=>dot.destroy()});
+  }
+  kill(z,x,y){
+    z.dead=true; this.kills++; this.combo++; this.comboT=2.4;
+    if(z.cfg.boss){                                                    // BOSS 死亡:大爆 + 冲击波 + 全屏白闪 + 切回 battle BGM + banner
+      // 冲击波环(从 BOSS 位置扩出)
+      const shock=this.add.circle(z.spr.x, z.spr.getBounds().centerY, 24).setStrokeStyle(8,0xffffff,0.95).setDepth(85);
+      this.tweens.add({targets:shock, radius:680, alpha:0, duration:900, onComplete:()=>shock.destroy()});
+      // 全屏白闪
+      if(this.flash){ this.flash.setAlpha(0.85); this.tweens.add({targets:this.flash,alpha:0,duration:520}); }
+      this.cameras.main.shake(900,0.022);
+      this.gore.emitParticleAt(z.spr.x,(z.spr.getBounds()).centerY,120);
+      this.bloods.emitParticleAt(z.spr.x,(z.spr.getBounds()).centerY,80);
+      if(this.anims.exists('fx_skull')){ const sk=this.add.sprite(z.spr.x,(z.spr.getBounds()).centerY,'fx_skull').setDepth(86).setScale(3.0).setBlendMode('ADD'); sk.play('fx_skull'); this.tweens.add({targets:sk,scale:4.5,alpha:0,duration:900,onComplete:()=>sk.destroy()}); }
+      this.showBanner('☠ BOSS DOWN · '+z.cfg.bossName+' ☠');
+      AudioFX.bossDeath(z.type);                                            // 专属塌缩死亡音
+      // r30: BOSS-defeat orchestral hit(在塌缩之后 280ms,与冲击波/全屏闪同步爽感)
+      this.time.delayedCall(280,()=>AudioFX.bossStinger && AudioFX.bossStinger());
+      const boss=document.getElementById('bossBgm'), bb=document.getElementById('battleBgm');
+      if(boss && bb) AudioFX.bgmCrossfade(boss, bb, boss.volume, 0.55, 800);
+      else if(bb){ bb.currentTime=0; bb.play().catch(()=>{}); }
+      this.activeBoss=null;
+      if(this.phaseVig){ this.tweens.killTweensOf(this.phaseVig); this.tweens.add({targets:this.phaseVig,alpha:0,duration:500}); }
+    }
+    z.shadow && this.tweens.add({targets:z.shadow,alpha:0,duration:420});
+    const pts=Math.round(z.cfg.score*(1+Math.floor(this.combo/5)*0.5));
+    this.score+=pts;
+    AudioFX.kill(z.spr.x); const load=this.zombies.length, burst0=(z.type==='brute'?40:22)*(load>18?0.5:1); this.bloods.emitParticleAt(z.spr.x, y, burst0);
+    this.floatText(z.spr.x, z.spr.getBounds().centerY, '+'+pts, '#d8b15a');
+    if(this.combo>1&&this.combo%10===0)this.showBanner(this.combo+' KILL STREAK');
+    // r26: 连击徽章里程碑弹跳 5/10/20/40
+    if(this.comboBadge && (this.combo===5||this.combo===10||this.combo===20||this.combo===40)){
+      this.tweens.killTweensOf(this.comboBadge);
+      this.tweens.add({targets:this.comboBadge,scale:1.35,duration:140,yoyo:true,ease:'Quad.easeOut'});
+    }
+    // 屏边连击脉冲:5 浅 / 10 强 / 15+ 极强
+    if(this.combo===5||this.combo===10||this.combo===15||(this.combo>15&&this.combo%5===0)){
+      const intensity = Math.min(0.65, 0.25+(this.combo-5)*0.05);
+      if(this.edgePulse){ this.edgePulse.setAlpha(0);
+        this.tweens.add({targets:this.edgePulse,alpha:intensity,duration:160,yoyo:true,hold:120,onYoyo:()=>{ this.tweens.add({targets:this.edgePulse,alpha:0,duration:280}); } }); }
+    }
+    // 倒地淡出
+    this.tweens.add({targets:z.spr, alpha:0, y:z.spr.y+18, angle:rnd(-12,12), duration:420,
+      onComplete:()=>{ z.shadow&&z.shadow.destroy(); z.spr.destroy(); this.zombies=this.zombies.filter(q=>q!==z); }});
+  }
+  floatText(x,y,t,c){ const o=this.add.text(x,y,t,{fontFamily:'"Oswald",sans-serif',fontSize:'22px',fontStyle:'600',color:c}).setOrigin(0.5).setDepth(85);
+    this.tweens.add({targets:o,y:y-40,alpha:0,duration:700,onComplete:()=>o.destroy()}); }
+
+  /* ---------- 受击 / 闪电 / 补给 ---------- */
+  hurtBunker(d){ this.bunkerHP=clamp(this.bunkerHP-d,0,this.maxHP); AudioFX.hurt();
+    this.cameras.main.shake(140,0.012); this.damageVig.setAlpha(.6);
+    this.tweens.add({targets:this.damageVig,alpha:0,duration:500});
+    this.dust.emitParticleAt(rnd(DW*0.3,DW*0.7),DH-120,14);
+    // Eisen 低血对白(<25% 且距上次>22s 触发)
+    const now=this.time.now||0;
+    if(this.bunkerHP/this.maxHP<0.25 && now-(this._eisenLowAt||0)>22000){
+      this._eisenLowAt=now;
+      const lines=EISEN_LINES.lowHealth; this.showEisenLine(lines[(Math.random()*lines.length)|0]);
+    }
+  }
+  lightning(){ this.flash.setAlpha(rnd(.35,.7)); this.tweens.add({targets:this.flash,alpha:0,duration:260}); AudioFX.thunder(); }
+  dropSupply(){
+    // r27: needs-weighted 智能掉落 + drought protection(连续 2 次未掉强制保底)
+    const hpRatio = this.bunkerHP / this.maxHP;
+    const ammoRatio = clamp(this.ammo / Math.max(1, this.clip), 0, 1);
+    // 基础权重(平衡态)
+    let wHeal = 1.0, wAmmo = 1.0, wBoost = 0.45;
+    // hp 越低 heal 权重越高(<25% 权重 ×5,<50% ×2.6)
+    if(hpRatio < 0.25) wHeal *= 5.0;
+    else if(hpRatio < 0.50) wHeal *= 2.6;
+    else if(hpRatio > 0.85) wHeal *= 0.3;
+    // ammo 越低 ammo 权重越高(<20% 权重 ×4,<40% ×2)
+    if(ammoRatio < 0.20) wAmmo *= 4.0;
+    else if(ammoRatio < 0.40) wAmmo *= 2.0;
+    else if(ammoRatio > 0.85) wAmmo *= 0.4;
+    // boost 严格限制:hp>50% & ammo>50% 才出
+    if(hpRatio <= 0.50 || ammoRatio <= 0.50) wBoost = 0;
+    // drought protection:追踪连续 2 次未触发的资源类型,强制保底
+    this._dropMiss = this._dropMiss || {ammo:0, heal:0};
+    if(hpRatio < 0.40 && this._dropMiss.heal >= 2) wHeal *= 10.0;       // hp 危且 2 次没掉 heal → 保底
+    if(ammoRatio < 0.30 && this._dropMiss.ammo >= 2) wAmmo *= 10.0;     // ammo 危且 2 次没掉 ammo → 保底
+    // 加权 roll
+    const total = wHeal + wAmmo + wBoost;
+    const r = Math.random() * total;
+    const kind = r < wAmmo ? 'ammo' : r < wAmmo + wHeal ? 'heal' : 'boost';
+    // 更新 miss 计数
+    ['ammo','heal'].forEach(k => { this._dropMiss[k] = k === kind ? 0 : (this._dropMiss[k]||0) + 1; });
+    const x=rnd(DW*0.3,DW*0.7);
+    const tex='sup_'+kind; let s;
+    if(this.textures.exists(tex)){
+      s=this.add.image(x,-30,tex).setOrigin(0.5).setDepth(55);
+      s.setScale(72/Math.max(s.width,s.height));                          // 统一显示 ~72px
+    } else {
+      const G={ammo:{g:'▣',c:'#d8b15a'},heal:{g:'✚',c:'#5fae6a'},boost:{g:'⚡',c:'#ff8c2a'}}[kind];
+      s=this.add.text(x,-30,G.g,{fontFamily:'"Black Ops One"',fontSize:'34px',color:G.c}).setOrigin(0.5).setDepth(55);
+    }
+    s.setData('kind',kind); s.setData('vy',0); s.setData('grounded',false); s.setData('life',9);
+    if(!this.supplies)this.supplies=[]; this.supplies.push(s); AudioFX.supply();
+    this.showBanner('SUPPLY DROP · '+(kind==='boost'?'⚡ POWER BOOST':kind==='ammo'?'AMMO':'MEDIC')); }
+
+  /* ---------- 主循环 ---------- */
+  update(time,delta){
+    const realDt=Math.min(delta/1000,0.05);
+    if((this._phaseFreeze||0)>0){ this._phaseFreeze-=realDt; if(this._phaseFreeze>0) return; }   // r22 punch frame
+    if(this.slowmoCD>0)this.slowmoCD-=realDt;                       // 慢动作冷却
+    if((this.boostTimer||0)>0)this.boostTimer-=realDt;              // damage boost 倒计时
+    if(this.slowmoT>0){ this.slowmoT-=realDt; if(this.slowmoT<=0){ if(this.slowVig)this.slowVig.setAlpha(0); AudioFX.diveOut(); } }
+    const dt = this.slowmoT>0? realDt*0.32 : realDt;                // 子弹时间:玩法 dt 减速
+    // 准星跟随(即使没 move 事件)
+    if(this.state!=='play'){ this.cross.setVisible(this.state==='pause'); return; }
+    this.cross.setVisible(true);
+
+    // 枪随准星上下左右移动(夸张跟随 + 待机呼吸晃动),枪口口随之移动
+    this.elapsed = (this.elapsed||0) + dt;
+    const idleX = Math.sin(this.elapsed*1.6)*17 + Math.sin(this.elapsed*0.6)*6;   // 待机横向呼吸(双频)
+    const idleY = Math.sin(this.elapsed*1.2+1)*13 + Math.cos(this.elapsed*0.5)*5; // 待机纵向呼吸
+    const idleA = Math.sin(this.elapsed*0.95)*2.4;
+    const aimDX = this.cross.x - DW/2;
+    const aimDY = this.cross.y - DH*0.5;
+    const targetGX = DW/2 + aimDX*0.17 + idleX;               // 左右横移(0.10→0.17 更夸张)
+    const targetGY = clamp(this.gunRestY + aimDY*0.24, this.gunRestY-76, this.gunRestY+34) + idleY; // 上下升降
+    const targetAng = clamp(aimDX*0.017, -14, 14) + idleA;    // 左右倾摆(±9°→±14°)
+    this.gunBaseX = lerp(this.gunBaseX, targetGX, 0.22);
+    this.gunBaseY = lerp(this.gunBaseY, targetGY, 0.22);
+    this.gunAng   = lerp(this.gunAng,   targetAng, 0.22);
+    this.recoil   = Math.max(0, this.recoil - dt*12);         // 后坐力衰减
+    this.gun.x = this.gunBaseX; this.gun.y = this.gunBaseY + this.recoil*12;
+    this.gun.setAngle(this.gunAng);
+    const aRad = Phaser.Math.DegToRad(this.gunAng);
+    this.muzzleX = this.gunBaseX + Math.sin(aRad)*this.barrelLen;
+    this.muzzleY = this.gun.y    - Math.cos(aRad)*this.barrelLen;
+
+    if(this.firing)this.tryFire();
+    if(this._flameOnT>0){ this._flameOnT-=dt; if(this._flameOnT<=0 && this.flameSpr){ this.flameSpr.setVisible(false); this.flameSpr.anims.stop(); } }
+    this.cooldown=Math.max(0,this.cooldown-dt);
+    if(this.reloading){ this.reloadT-=dt; if(this.reloadT<=0){ this.reloading=false; this.ammo=this.clip; AudioFX.reloadDone(); } }
+    if(!this.reloading && this.ammo>0 && this.ammo<=Math.max(2, this.clip*0.10) && this.firing) AudioFX.lowAmmoTick();
+    if(this.comboT>0){ this.comboT-=dt; if(this.comboT<=0)this.combo=0; }
+
+    // 波次调度
+    if(this.betweenWave){ this.waveTimer-=dt; if(this.waveTimer<=0)this.startWave(); }
+    else if(this.waveActive){ this.spawnT+=dt;
+      while(this.spawnQ.length && this.spawnQ[0].delay<=this.spawnT){ this.spawn(this.spawnQ.shift().t); }
+      if(this.spawnQ.length===0 && this.zombies.length===0){
+        this.waveActive=false; this.onWaveCleared();
+      }
+    }
+
+    // 僵尸推进(透视缩放 + 程序化行走步态)
+    for(const z of this.zombies){ if(z.dead)continue;
+      if(z.emerge>0)z.emerge=Math.max(0,z.emerge-dt*0.7);
+      // BOSS 多阶段:hp 跨 66%/33% 触发狂暴+召唤+震屏
+      if(z.cfg.boss){
+        if(!z._phase2 && z.hp <= z.maxhp*0.66){
+          z._phase2=true; z._spdMul=(z._spdMul||1)*1.35;
+          for(let i=0;i<2;i++){ this.spawn('runner',{skipTell:true, x:z.spr.x+rnd(-80,80)}); const rr=this.zombies[this.zombies.length-1]; if(rr){rr.emerge=0; rr.roared=true;} }
+          this.cameras.main.shake(560,0.010); AudioFX.bossPhase(z.spr.x); AudioFX.bossRoar(z.type, z.spr.x);
+          this._bossPhaseFx(z, 1);
+          this.showBanner('PHASE 2 · '+z.cfg.bossName);
+        }
+        if(!z._phase3 && z.hp <= z.maxhp*0.33){
+          z._phase3=true; z._spdMul=(z._spdMul||1)*1.25;
+          for(let i=0;i<3;i++){ this.spawn('runner',{skipTell:true, x:z.spr.x+rnd(-120,120)}); const rr=this.zombies[this.zombies.length-1]; if(rr){rr.emerge=0; rr.roared=true;} }
+          this.cameras.main.shake(820,0.014); AudioFX.bossPhase(z.spr.x); AudioFX.bossRoar(z.type, z.spr.x);
+          this._bossPhaseFx(z, 2);
+          this.showBanner('☠ FINAL PHASE ☠');
+          if(this.edgePulse){ this.edgePulse.setAlpha(0); this.tweens.add({targets:this.edgePulse,alpha:0.6,duration:300,yoyo:true,hold:300,repeat:3,onComplete:()=>this.edgePulse.setAlpha(0)}); }
+        }
+      }
+      const cap=(z.cfg.behavior==='ranged')?(z.cfg.stopAt||0.6):1;   // 投掷兵中距停下
+      z.p=Math.min(cap,z.p + z.cfg.speed*dt*1.18*(z._spdMul||1));    // 全局推进 +18%(BOSS phase shift 加成)
+      const easeY=Math.pow(z.p,1.35);             // 纵深位置
+      const dispH=lerp(44, z.cfg.nearH, Math.pow(z.p,1.7));  // 目标显示高度(px)
+      const base=dispH / z.spr.height;            // 兼容动画帧(323px)/静态贴图(~1946px)原生尺寸
+      const am=z.animated?0.4:1;                  // 动画帧已含腿/臂运动 → 程序化步态减弱
+      // 行走步态:踏地相位 → head-bob + 左右摇摆 + 落脚 squash
+      z.step += dt * z.cfg.step * (z.p<1?1:0.55);
+      const foot=Math.abs(Math.sin(z.step));      // 0..1 踏地
+      const rock=Math.sin(z.step*0.5);            // 重心左右摇
+      const bobPx=foot*dispH*z.cfg.bob*am;
+      const swayPx=rock*lerp(13,3,z.p)*am;
+      const squash=1 - foot*0.03*am;              // 落脚微压
+      const x=lerp(z.x0, lerp(z.x0,DW/2,0.10), z.p) + swayPx;
+      const y=lerp(HORIZON_Y, FRONT_Y, easeY) - bobPx;
+      const sb = z._scaleBoost || 1;            // r28: leviathan sprite cell padding 补偿
+      z._sxNow=base*sb; z._syNow=base*squash*sb;
+      z.spr.setPosition(x,y).setAngle(rock*z.cfg.rock*am).setAlpha(1 - z.emerge*0.85);
+      if(!z._pulsing) z.spr.setScale(z._sxNow, z._syNow);
+      // r28: Leviathan 8 帧行为机驱动
+      if(z.type==='leviathan') this.updateBossAnim(z);
+      const newDepth=10+(z.p*40|0); if(z.spr.depth!==newDepth) z.spr.setDepth(newDepth);
+      if(z.shadow){ const sw=dispH*0.42, sa=lerp(0.12,0.40,Math.pow(z.p,1.3)); z.shadow.setPosition(x, y+2).setScale(sw/40,(sw*0.28)/12).setDepth(newDepth-0.5).setAlpha(sa*(1-z.emerge)); }
+      // 逼近(p≥0.66)→ 张嘴惨叫 + 前扑脉冲 + 红闪 +(大体型)震屏
+      const ROAR_AT=0.66;
+      if(!z.roared && z.p>=ROAR_AT){ z.roared=true;
+        this.roarBusy=(this.roarBusy||0);
+        if(this.roarBusy<2){ this.roarBusy++; AudioFX.roar(z.type, z.spr.x); this.time.delayedCall(260,()=>{ this.roarBusy=Math.max(0,(this.roarBusy||1)-1); }); }
+        // r28: Leviathan 逼近吼叫切 roar 帧(替代 tint 闪)
+        if(z.type==='leviathan') this.bossLevRoar(z);
+        const sx=z._sxNow, sy=z._syNow;
+        this.tweens.add({ targets:z.spr, scaleX:sx*1.18, scaleY:sy*1.12, duration:120, yoyo:true, ease:'Quad.easeOut', onStart:()=>{ z._pulsing=true; }, onComplete:()=>{ z._pulsing=false; if(!z.dead) z.spr.setScale(z._sxNow,z._syNow); } });
+        if(!z.dead){ z.spr.setTintFill(0xb01616); this.time.delayedCall(140,()=>{ if(!z.dead) z.spr.setTint(z.cfg.tint); }); }
+        const big = z.cfg.nearH>=330; if(big) this.cameras.main.shake(z.type==='brute'?180:120, z.type==='brute'?0.010:0.006); }
+      // 行为分支:投掷兵远程投掷 / 自爆兵自爆 / 其余近身攻击
+      if(z.cfg.behavior==='ranged' && z.p>=(z.cfg.stopAt||0.6)){
+        z.atkT-=dt; if(z.atkT<=0){ z.atkT=z.cfg.fireEvery||2.0; this.spit(z); } }
+      else if(z.p>=1){
+        if(z.cfg.behavior==='explode'){ this.explode(z); }
+        else { z.atkT-=dt; if(z.atkT<=0){ z.atkT=z.cfg.boss?1.6:0.85;
+          // r28: Leviathan 攻击 bunker 时切 slash 帧(左右交替)
+          if(z.type==='leviathan') this.bossLevSlash(z);
+          this.hurtBunker(z.cfg.dmg||10); } } }
+    }
+
+    // 补给下落 / 拾取
+    if(this.supplies){ for(const s of this.supplies){
+      if(!s.getData('grounded')){ let vy=s.getData('vy')+700*dt; s.y+=vy*dt; s.setData('vy',vy);
+        if(s.y>=DH-130){ s.y=DH-130; s.setData('grounded',true); } }
+      else { s.setData('life',s.getData('life')-dt); if(s.getData('life')<3)s.setAlpha(0.4+0.3*Math.sin(time/80)); }
+      if(Phaser.Math.Distance.Between(s.x,s.y,this.cross.x,this.cross.y)<70 && this.firing){ this.grab(s); }
+    }
+    this.supplies=this.supplies.filter(s=>{ if(s.getData('life')<=0){s.destroy();return false;} return s.active; }); }
+
+    if(this.bunkerHP<=0)this.gameOver();
+    this.syncHUD();
+  }
+  grab(s){ const k=s.getData('kind');
+    if(k==='ammo'){ AudioFX.ammoPickup(); WEAPONS.forEach(w=>this.wAmmo[w.id]=w.clip); this.ammo=this.weapon().clip; this.reloading=false; this.showBanner('ALL WEAPONS RESUPPLIED'); }
+    else if(k==='heal'){ AudioFX.healPickup(); this.bunkerHP=clamp(this.bunkerHP+25,0,this.maxHP); this.showBanner('BUNKER REPAIRED +25'); }
+    else if(k==='boost'){ AudioFX.boostPickup(); this.boostTimer=6; this.damageVig.setAlpha(0.55); this.tweens.add({targets:this.damageVig,alpha:0,duration:380}); this.showBanner('⚡ POWER BOOST ×2 · 6s'); }
+    s.setData('life',0); }
+
+  syncHUD(){
+    this.hudScore.setText(String(this.score).padStart(5,'0'));
+    this.hudWave.setText('SECTOR '+this.level+' · WAVE '+this.waveInLevel+'/'+this.wavesForLevel(this.level));
+    this.hudCombo.setText(this.combo>1?('STREAK ×'+this.combo):'');
+    // r26: 连击徽章 + 衰减进度环 + 颜色升级
+    if(this.comboBadge){
+      const showBadge = this.combo>=5;
+      if(showBadge !== this.comboBadge.visible){
+        this.comboBadge.setVisible(showBadge);
+        if(showBadge){ this.comboBadge.setScale(0.3); this.tweens.add({targets:this.comboBadge,scale:1,duration:240,ease:'Back.easeOut'}); }
+      }
+      if(showBadge){
+        // 颜色升级:5/10/20/40
+        const tier = this.combo>=40?{c:0xff3a2a,t:'#ff7a52'}:this.combo>=20?{c:0xff8c52,t:'#ffd24a'}:this.combo>=10?{c:0xffd24a,t:'#fff4cc'}:{c:0xd8b15a,t:'#fff4cc'};
+        this.comboBadgeBg.setStrokeStyle(3, tier.c);
+        this.comboBadgeNum.setText('×'+this.combo).setColor(tier.t);
+        const mul = 1 + Math.floor(this.combo/5)*0.5;
+        this.comboBadgeMul.setText('+'+Math.round((mul-1)*100)+'%');
+        // 衰减进度环(comboT 满值 2.4,环从 360° 缩到 0°)
+        const p = clamp(this.comboT/2.4, 0, 1);
+        this.comboBadgeRing.clear();
+        this.comboBadgeRing.lineStyle(4, tier.c, p>0.3?0.95:(0.5+0.45*Math.sin(this.time.now/80)));
+        this.comboBadgeRing.beginPath();
+        this.comboBadgeRing.arc(0,0,50,-Math.PI/2,-Math.PI/2+Math.PI*2*p,false);
+        this.comboBadgeRing.strokePath();
+      } else { this.comboBadgeRing.clear(); }
+    }
+    const hp=this.bunkerHP/this.maxHP;
+    this.hpFill.width=256*hp; this.hpFill.fillColor = hp>.5?0x5fae6a:hp>.25?0xd8b15a:0xc23a3a;
+    // r27: Critical-HP alarm — hp<25% 触发红色脉冲暗角 + HP bar 心跳 + heartbeat SFX 节流
+    if(this.critVig){
+      const isCrit = hp < 0.25 && this.state==='play' && this.bunkerHP > 0;
+      if(isCrit){
+        // 脉冲频率随 hp 加快 — hp 0.25→0.05 → bpm 90→160(period 666ms→375ms)
+        const bpm = 90 + (1 - clamp(hp/0.25, 0, 1)) * 70;
+        const period = 60000/bpm; // ms per beat
+        const phase = (this.time.now % period) / period; // 0..1
+        const pulse = 0.5 - 0.5*Math.cos(phase*Math.PI*2); // 0..1..0
+        // critVig alpha 0.25 base + 0.55 pulse,越危急基础越深
+        const base = 0.18 + (1 - clamp(hp/0.25, 0, 1)) * 0.25;
+        this.critVig.setAlpha(base + 0.45*pulse);
+        // HP bar 心跳:scaleY 1→1.45 同步 + 边色脉冲
+        this.hpFill.scaleY = 1 + 0.45*pulse;
+        this.hpBack && this.hpBack.setStrokeStyle(2, pulse>0.7 ? 0xff3a2a : 0x000000);
+        // heartbeat SFX:每拍开始触发一次(phase 0→0.05 窗口)
+        if(phase < 0.04 && this.time.now - (this._lastHBT||0) > period*0.6){
+          AudioFX.heartbeat && AudioFX.heartbeat(0.5 + (1-hp/0.25)*0.7);
+          this._lastHBT = this.time.now;
+        }
+      } else if(this.critVig.alpha > 0){
+        this.critVig.setAlpha(0);
+        this.hpFill.scaleY = 1;
+        this.hpBack && this.hpBack.setStrokeStyle(2, 0x000000);
+      }
+    }
+    this.hudAmmo.setText(this.reloading?'RELOADING…':(this.ammo+' / '+this.clip));
+    this.hudAmmo.setColor(this.reloading?'#d8b15a':(this.ammo<=20?'#c23a3a':'#e7e6df'));
+    if(this.ammoFill){ this.ammoFill.width=206*(this.ammo/this.clip); this.ammoFill.fillColor=this.reloading?0x5b6b6e:(this.ammo<=20?0xc23a3a:0xd8b15a); }
+    if(this.reloadRing){
+      if(this.reloading){ const p=1-(this.reloadT/this.reloadDur); this.reloadRing.setVisible(true); this.reloadRingTxt.setVisible(true); this.drawReloadRing(p); }
+      else { this.reloadRing.setVisible(false); this.reloadRingTxt.setVisible(false); }
+    }
+    if(this.levelBarFill){ const total=this.wavesForLevel(this.level), p=clamp(this.waveInLevel/total,0,1);
+      this.levelBarFill.width=(DW-40)*p; this.levelBarTxt.setText('LEVEL '+this.level+' · '+this.waveInLevel+' / '+total); }
+    if(this.boostBadge){
+      if((this.boostTimer||0)>0){ this.boostBadge.setVisible(true); this.boostBadgeTxt.setVisible(true).setText('×2  '+this.boostTimer.toFixed(1)+'s'); const pulse=0.85+0.15*Math.sin(this.time.now/80); this.boostBadge.setAlpha(pulse); }
+      else { this.boostBadge.setVisible(false); this.boostBadgeTxt.setVisible(false); }
+    }
+    if(this.activeBoss && !this.activeBoss.dead && this.bossHpFill){
+      const bz=this.activeBoss, p=Math.max(0,bz.hp/bz.maxhp);
+      if(!this.bossHpFill.visible){
+        [this.bossHpName,this.bossHpSub,this.bossHpBack,this.bossHpFill,this.bossHpTicks].forEach(o=>o.setVisible(true));
+        this.bossHpName.setText('☠  '+bz.cfg.bossName+'  ☠').setScale(0.6).setAlpha(0);
+        // r28-fix: 用 width 入场动画(不用 scaleX),与后续 update tween 同 prop 不打架;入场期间禁 update
+        this.bossHpFill.scaleX = 1;                              // 确保 scaleX 复位(防 r22 旧残留)
+        this.bossHpFill.width = 0;                                // 入场起点
+        this._bossHpEntering = true;
+        this.tweens.add({targets:this.bossHpName,scale:1,alpha:1,duration:520,ease:'Back.easeOut'});
+        this.tweens.add({targets:this.bossHpFill,width:716*p,duration:680,ease:'Cubic.easeOut',
+          onComplete:()=>{ this._bossHpEntering=false; }});
+        this.cameras.main.shake(220,0.006);
+      } else if(!this._bossHpEntering){
+        this.tweens.killTweensOf(this.bossHpFill);
+        this.tweens.add({targets:this.bossHpFill,width:716*p,duration:280,ease:'Quad.easeOut'});
+      }
+      this.bossHpFill.fillColor = p>0.66?0xff3a2a:p>0.33?0xff8c2a:0xffd24a;
+    } else if(this.bossHpFill && this.bossHpFill.visible){
+      [this.bossHpName,this.bossHpSub,this.bossHpBack,this.bossHpFill,this.bossHpTicks].forEach(o=>o.setVisible(false));
+      this._bossHpEntering = false;
+    }
+  }
+
+  gameOver(){ if(this.state==='over')return; this.state='over'; AudioFX.over(); AudioFX.stopBGM(); this.firing=false;
+    const bb=document.getElementById('battleBgm'); bb&&bb.pause();
+    const tb=document.getElementById('titleBgm'); if(tb){ tb.volume=0.4; tb.currentTime=0; tb.play().catch(()=>{}); }
+    if(this.score>this.best){ this.best=this.score; localStorage.setItem('nbs2_best',this.best); }
+    document.getElementById('overWave').textContent=this.wave;
+    document.getElementById('overKills').textContent=this.kills;
+    document.getElementById('overScore').textContent=this.score;
+    document.getElementById('overBest').textContent = this.score>=this.best?'★ NEW RECORD':('BEST '+this.best);
+    const ol=document.getElementById('overLevel'); if(ol)ol.textContent=Math.max(1,this.level||1);
+    document.getElementById('over').classList.remove('hidden');
+  }
+  // r24: 暂停菜单
+  showPauseMenu(){
+    if(this.state==='cutscene'||this.state==='chapter'||this.state==='over')return;
+    this.state='pause'; this.firing=false;
+    const pl=document.getElementById('pauseLevel'); if(pl)pl.textContent=Math.max(1,this.level||1);
+    document.getElementById('pause').classList.remove('hidden');
+    // BGM duck during pause
+    const bb=document.getElementById('battleBgm'), boss=document.getElementById('bossBgm');
+    [bb,boss].forEach(el=>{ if(el && !el.paused){ el._pauseVol=el.volume; el.volume=Math.max(0.1, el.volume*0.4); } });
+  }
+  hidePauseMenu(){
+    if(this.state!=='pause')return;
+    this.state='play';
+    document.getElementById('pause').classList.add('hidden');
+    const bb=document.getElementById('battleBgm'), boss=document.getElementById('bossBgm');
+    [bb,boss].forEach(el=>{ if(el && el._pauseVol!=null){ el.volume=el._pauseVol; el._pauseVol=null; } });
+  }
+  quitToTitle(){
+    document.getElementById('pause').classList.add('hidden');
+    document.getElementById('over').classList.add('hidden');
+    document.getElementById('cutscene').classList.add('hidden');
+    document.getElementById('chapter').classList.add('hidden');
+    this.hideEpigraph();   // r28 Pick B: quit 清章节引言板
+    this.zombies.forEach(z=>{z.shadow&&z.shadow.destroy(); z.spr.destroy();}); this.zombies=[];
+    this.state='title';
+    const bb=document.getElementById('battleBgm'), boss=document.getElementById('bossBgm');
+    [bb,boss].forEach(el=>{ if(el){ el.pause(); el.volume=0.55; el._pauseVol=null; } });
+    const tb=document.getElementById('titleBgm'); if(tb){ tb.volume=0.4; tb.currentTime=0; tb.play().catch(()=>{}); }
+    document.getElementById('title').classList.remove('hidden');
+  }
+  // r23: 失败重生 — 从当前关重开,保留 score/kills/best
+  retrySector(){
+    const lv=Math.max(1,this.level||1);
+    const keepScore=this.score, keepKills=this.kills;
+    this.resetState();
+    this.score=keepScore; this.kills=keepKills;
+    this.level=lv; this.waveInLevel=0;
+    this.state='play';
+    document.getElementById('over').classList.add('hidden'); document.getElementById('title').classList.add('hidden'); document.getElementById('cutscene').classList.add('hidden');
+    const tb=document.getElementById('titleBgm'); tb&&tb.pause();
+    const bb=document.getElementById('battleBgm'); if(bb){ bb.volume=0.55; bb.currentTime=0; bb.play().catch(()=>AudioFX.startBGM()); } else AudioFX.startBGM();
+    this.state='chapter'; this.betweenWave=true; this.waveTimer=99;
+    this.showChapterCard();
+    this.time.delayedCall(1600,()=>{ this.hideChapterCard();
+      // r28 Pick B: retry 也走 chapter → epigraph → play
+      this.showEpigraph(this.level).then(()=>{
+        if(this.state==='title'||this.state==='over')return;
+        this.state='play'; this.waveTimer=1.4;
+        this.showEisenLine(EISEN_LINES.chapter[this.level]);
+      });
+    });
+  }
+}
+
+/* ---------- 启动 ---------- */
+const DPR = Math.min(window.devicePixelRatio||1, 2);
+const game = new Phaser.Game({
+  type: Phaser.AUTO, parent:'game-container',
+  width: DW, height: DH, backgroundColor:'#05080a',
+  scale:{ mode:Phaser.Scale.FIT, autoCenter:Phaser.Scale.CENTER_BOTH, width:DW, height:DH, zoom:1/DPR },
+  render:{ antialias:true, antialiasGL:true, roundPixels:false, pixelArt:false, powerPreference:'high-performance', mipmapFilter:'LINEAR_MIPMAP_LINEAR', desynchronized:true },
+  scene: Battle
+});
+function getScene(){ return game.scene.getScene('Battle'); }
+document.getElementById('startBtn').addEventListener('click',()=>{ const s=getScene(); s&&s.startGame(); });
+document.getElementById('retryBtn').addEventListener('click',()=>{ const s=getScene(); s&&s.startGame(); });
+document.getElementById('retrySectorBtn').addEventListener('click',()=>{ const s=getScene(); s&&s.retrySector(); });
+document.getElementById('resumeBtn').addEventListener('click',()=>{ const s=getScene(); s&&s.hidePauseMenu(); });
+document.getElementById('pauseRetrySectorBtn').addEventListener('click',()=>{ const s=getScene(); if(s){ document.getElementById('pause').classList.add('hidden'); s.retrySector(); } });
+document.getElementById('quitBtn').addEventListener('click',()=>{ const s=getScene(); s&&s.quitToTitle(); });
+// r26: 音量主控 + Mute(暂停菜单内)
+(function bindAudioUI(){
+  const vol=document.getElementById('masterVol'), txt=document.getElementById('masterVolTxt'), mute=document.getElementById('muteBtn');
+  // 同步初始 UI(从 localStorage 恢复)
+  const v0=Math.round((AudioFX.getMasterVolume?AudioFX.getMasterVolume():1)*100);
+  const m0=AudioFX.getMuted?AudioFX.getMuted():false;
+  vol.value=v0; txt.textContent=v0+'%';
+  mute.textContent = m0?'🔇 MUTED':'🔊 SOUND';
+  AudioFX._applyVol && AudioFX._applyVol();
+  vol.addEventListener('input',()=>{ const v=+vol.value; txt.textContent=v+'%'; AudioFX.setMasterVolume(v/100); });
+  mute.addEventListener('click',()=>{ const m=!AudioFX.getMuted(); AudioFX.setMuted(m); mute.textContent=m?'🔇 MUTED':'🔊 SOUND'; });
+  // M 键全局静音切换
+  window.addEventListener('keydown',e=>{ if(e.key==='m'||e.key==='M'){ const m=!AudioFX.getMuted(); AudioFX.setMuted(m); mute.textContent=m?'🔇 MUTED':'🔊 SOUND'; } });
+})();
+document.getElementById('cutBtn').addEventListener('click',()=>{ const s=getScene(); if(s){ s.hideCutscene(); const vm=document.getElementById('victoryBgm'); vm&&vm.pause(); s.startGame(); } });
+</script>
+</body>
+</html>

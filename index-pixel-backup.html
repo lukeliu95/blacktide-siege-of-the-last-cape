@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>诺曼底碉堡：艾森豪威尔的最后防线</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b1418; --ink:#dfe8e2; --steel:#5b6b6e; --sand:#c9b07a;
+    --blood:#9c2b2b; --gold:#d9b34a; --sea:#274856;
+    --font-display:"Press Start 2P",ui-monospace,monospace;  /* 展示字体:标题/提示 */
+    --font-body:"Courier New",ui-monospace,monospace;        /* 正文字体:HUD/数据 */
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:var(--bg);overflow:hidden;
+    font-family:var(--font-body);color:var(--ink);
+    -webkit-user-select:none;user-select:none;touch-action:none}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  canvas{image-rendering:pixelated;image-rendering:crisp-edges;
+    background:#08121a;box-shadow:0 0 0 2px #1a2c30,0 24px 70px rgba(0,0,0,.7);
+    max-width:100vw;max-height:100vh}
+  /* CRT scanlines overlay */
+  #scan{position:fixed;inset:0;pointer-events:none;z-index:5;mix-blend-mode:overlay;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.0) 0 2px,rgba(0,0,0,.22) 2px 4px);
+    opacity:.5}
+  #vig{position:fixed;inset:0;pointer-events:none;z-index:4;
+    background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55) 100%)}
+  #hint{position:fixed;left:50%;bottom:10px;transform:translateX(-50%);
+    z-index:6;font-family:var(--font-display);font-size:8px;letter-spacing:1px;
+    color:#7c8d84;opacity:.85;text-align:center;line-height:1.6}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="c" width="960" height="540"></canvas></div>
+<div id="scan"></div><div id="vig"></div>
+<div id="hint">鼠标瞄准 · 点击/按住开火 · A/D 移动 · R 换弹 · P 暂停</div>
+<script>
+"use strict";
+/* ===========================================================================
+   诺曼底碉堡 · 艾森豪威尔的最后防线
+   单文件 Canvas 像素射击 · 固定机位波次防守 · 零依赖
+   =========================================================================== */
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+g.imageSmoothingEnabled = false;
+
+/* ---------- 工具 ---------- */
+const rand=(a,b)=>a+Math.random()*(b-a);
+const ri=(a,b)=>Math.floor(rand(a,b+1));
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const dist=(x1,y1,x2,y2)=>Math.hypot(x2-x1,y2-y1);
+const lerp=(a,b,t)=>a+(b-a)*t;
+const now=()=>performance.now();
+
+/* ---------- 音频(WebAudio 程序化音效) ---------- */
+const AudioFX=(()=>{
+  let ac=null;
+  const ensure=()=>{ if(!ac){ try{ac=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(ac&&ac.state==='suspended')ac.resume(); return ac; };
+  function tone(f,dur,type,vol,slideTo){
+    const a=ensure(); if(!a)return;
+    const o=a.createOscillator(),gn=a.createGain();
+    o.type=type||'square'; o.frequency.setValueAtTime(f,a.currentTime);
+    if(slideTo)o.frequency.exponentialRampToValueAtTime(Math.max(40,slideTo),a.currentTime+dur);
+    gn.gain.setValueAtTime(vol||.08,a.currentTime);
+    gn.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+dur);
+    o.connect(gn).connect(a.destination); o.start(); o.stop(a.currentTime+dur);
+  }
+  function noise(dur,vol){
+    const a=ensure(); if(!a)return;
+    const n=Math.floor(a.sampleRate*dur), buf=a.createBuffer(1,n,a.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
+    const src=a.createBufferSource(),gn=a.createGain(),flt=a.createBiquadFilter();
+    src.buffer=buf; flt.type='lowpass'; flt.frequency.value=1800;
+    gn.gain.value=vol||.12; src.connect(flt).connect(gn).connect(a.destination); src.start();
+  }
+  return {
+    shoot(){ tone(rand(620,760),.06,'square',.05,180); noise(.05,.06); },
+    reload(){ tone(300,.07,'square',.06); setTimeout(()=>tone(520,.08,'square',.06),120); },
+    empty(){ tone(180,.05,'square',.05); },
+    hit(){ noise(.06,.10); tone(rand(140,200),.08,'sawtooth',.05,80); },
+    kill(){ tone(rand(90,130),.18,'sawtooth',.07,50); noise(.12,.10); },
+    hurt(){ tone(160,.25,'sawtooth',.10,60); noise(.18,.14); },
+    wave(){ tone(440,.12,'triangle',.07); setTimeout(()=>tone(660,.16,'triangle',.07),130); },
+    supply(){ tone(880,.09,'triangle',.06); setTimeout(()=>tone(1175,.12,'triangle',.06),90); },
+    over(){ tone(330,.5,'sawtooth',.10,70); setTimeout(()=>tone(220,.7,'sawtooth',.10,50),200); }
+  };
+})();
+
+/* ---------- 输入 ---------- */
+const mouse={x:W/2,y:H/2,down:false};
+const keys={};
+function relPos(e){
+  const r=cv.getBoundingClientRect();
+  const cx=(e.touches?e.touches[0].clientX:e.clientX);
+  const cy=(e.touches?e.touches[0].clientY:e.clientY);
+  mouse.x=clamp((cx-r.left)/r.width*W,0,W);
+  mouse.y=clamp((cy-r.top)/r.height*H,0,H);
+}
+cv.addEventListener('mousemove',relPos);
+cv.addEventListener('mousedown',e=>{relPos(e);mouse.down=true;onPrimary();});
+window.addEventListener('mouseup',()=>mouse.down=false);
+cv.addEventListener('touchstart',e=>{e.preventDefault();relPos(e);mouse.down=true;onPrimary();},{passive:false});
+cv.addEventListener('touchmove',e=>{e.preventDefault();relPos(e);},{passive:false});
+window.addEventListener('touchend',e=>{mouse.down=false;});
+window.addEventListener('keydown',e=>{
+  keys[e.key.toLowerCase()]=true;
+  if(e.key.toLowerCase()==='r')reload();
+  if(e.key.toLowerCase()==='p'&&state==='play')state='pause';
+  else if(e.key.toLowerCase()==='p'&&state==='pause')state='play';
+  if(e.code==='Space'){e.preventDefault();onPrimary();}
+});
+window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+
+function onPrimary(){
+  AudioFX.shoot&&0; // ensure audio unlock on gesture
+  if(state==='title'){startGame();return;}
+  if(state==='over'){state='title';return;}
+  if(state==='pause'){state='play';return;}
+}
+
+/* ---------- 游戏状态 ---------- */
+let state='title'; // title | play | pause | over
+const SEA_Y=300;            // 海平面 y
+const BEACH_Y=H;            // 沙滩底
+const BUNKER_X=140;         // 碉堡中心 x
+let hero, bunkerHP, maxBunkerHP, score, wave, waveTimer, enemies, bullets, particles, casings, supplies, shake, comboTimer, combo, killCount, waveActive, betweenWave, msg, msgT;
+let best = +(localStorage.getItem('nbs_best')||0);
+
+function reset(){
+  hero={x:BUNKER_X,y:SEA_Y-46,w:22,h:40,facing:1,
+        ammo:8,clip:8,reserve:9999,reloading:false,reloadT:0,
+        cooldown:0,fireRate:130,muzzle:0,recoil:0,bob:0};
+  maxBunkerHP=100; bunkerHP=100;
+  score=0; wave=0; killCount=0; combo=0; comboTimer=0;
+  enemies=[]; bullets=[]; particles=[]; casings=[]; supplies=[];
+  shake=0; waveActive=false; betweenWave=true; waveTimer=2.0;
+  msg=''; msgT=0;
+}
+
+function startGame(){ reset(); state='play'; AudioFX.wave(); }
+
+/* ---------- 波次系统 ---------- */
+function startWave(){
+  wave++; waveActive=true; betweenWave=false;
+  const count = 4 + Math.floor(wave*1.6);
+  const baseHP = 2 + Math.floor(wave/3);
+  const spd = 14 + wave*1.4;
+  spawnQueue=[];
+  for(let i=0;i<count;i++){
+    const elite = wave>=3 && Math.random()<Math.min(.06+wave*0.02,.3);
+    spawnQueue.push({delay: i*rand(.45,1.0), elite, hp:elite?baseHP*3+4:baseHP, spd: elite?spd*0.7:spd*rand(.85,1.2)});
+  }
+  spawnT=0; setMsg('第 '+wave+' 波 来袭',1.6); AudioFX.wave();
+}
+let spawnQueue=[], spawnT=0;
+
+function spawnEnemy(cfg){
+  const fromTop = Math.random()<.5;
+  const ex = rand(W*0.42, W-30);
+  const ey = SEA_Y - rand(6,30);
+  enemies.push({
+    x:ex, y:ey, vx:0, vy:0, w:16, h:26,
+    hp:cfg.hp, maxhp:cfg.hp, spd:cfg.spd, elite:cfg.elite,
+    phase:rand(0,6.28), step:0, hurt:0, dead:false,
+    targetX: BUNKER_X+rand(10,46), atkT:0, emerge:1.0
+  });
+}
+
+function setMsg(t,dur){ msg=t; msgT=dur; }
+
+/* ---------- 射击 ---------- */
+function reload(){
+  if(state!=='play')return;
+  if(hero.reloading||hero.ammo>=hero.clip)return;
+  hero.reloading=true; hero.reloadT=0.9; AudioFX.reload();
+}
+function tryFire(){
+  if(hero.reloading||hero.cooldown>0)return;
+  if(hero.ammo<=0){ AudioFX.empty(); reload(); return; }
+  hero.ammo--; hero.cooldown=hero.fireRate/1000; hero.muzzle=1; hero.recoil=1;
+  AudioFX.shoot();
+  // 枪口位置
+  const mx=hero.x+hero.facing*16, my=hero.y-6;
+  const ang=Math.atan2(mouse.y-my, mouse.x-mx);
+  const spread=rand(-.03,.03);
+  const sp=720;
+  bullets.push({x:mx,y:my,vx:Math.cos(ang+spread)*sp,vy:Math.sin(ang+spread)*sp,life:1.2,trail:[]});
+  // 弹壳
+  casings.push({x:mx,y:my,vx:rand(-60,-160)*hero.facing*-1,vy:rand(-180,-260),rot:rand(0,6),vr:rand(-12,12),life:1.2,g:600});
+  shake=Math.min(shake+1.2,6);
+  // 枪口火光粒子
+  for(let i=0;i<4;i++)particles.push({x:mx+Math.cos(ang)*10,y:my+Math.sin(ang)*10,vx:Math.cos(ang)*rand(40,160)+rand(-30,30),vy:Math.sin(ang)*rand(40,160)+rand(-30,30),life:rand(.1,.25),c:'#ffd66b',r:rand(1,3)});
+}
+
+/* ---------- 更新 ---------- */
+let last=now();
+function update(dt){
+  if(state!=='play')return;
+
+  // 英雄移动(碉堡顶左右微调)
+  const mvL=keys['a']||keys['arrowleft'], mvR=keys['d']||keys['arrowright'];
+  if(mvL)hero.x-=70*dt; if(mvR)hero.x+=70*dt;
+  hero.x=clamp(hero.x,BUNKER_X-40,BUNKER_X+70);
+  hero.facing = (mouse.x>=hero.x)?1:-1;
+  hero.bob += dt*4;
+  hero.muzzle=Math.max(0,hero.muzzle-dt*8);
+  hero.recoil=Math.max(0,hero.recoil-dt*6);
+  hero.cooldown=Math.max(0,hero.cooldown-dt);
+  if(hero.reloading){ hero.reloadT-=dt; if(hero.reloadT<=0){ hero.reloading=false; hero.ammo=hero.clip; } }
+  if(mouse.down)tryFire();
+
+  // combo 衰减
+  if(comboTimer>0){comboTimer-=dt; if(comboTimer<=0)combo=0;}
+
+  // 波次调度
+  if(betweenWave){
+    waveTimer-=dt;
+    if(waveTimer<=0)startWave();
+  } else if(waveActive){
+    spawnT+=dt;
+    while(spawnQueue.length && spawnQueue[0].delay<=spawnT){ spawnEnemy(spawnQueue.shift()); }
+    if(spawnQueue.length===0 && enemies.length===0){
+      waveActive=false; betweenWave=true; waveTimer=rand(2.5,3.5);
+      setMsg('防线守住了 · 整备',1.6);
+      // 波间补给空投概率
+      if(Math.random()<.7)dropSupply();
+    }
+  }
+
+  // 子弹
+  for(let b of bullets){
+    b.trail.push({x:b.x,y:b.y}); if(b.trail.length>5)b.trail.shift();
+    b.x+=b.vx*dt; b.y+=b.vy*dt; b.life-=dt;
+    for(let e of enemies){
+      if(e.dead)continue;
+      if(Math.abs(b.x-e.x)<e.w*0.6 && b.y>e.y-e.h && b.y<e.y+4){
+        e.hp--; e.hurt=0.12; b.life=0;
+        AudioFX.hit();
+        bloodBurst(b.x,b.y,e.elite);
+        if(e.hp<=0){ killEnemy(e,b.x,b.y); }
+        break;
+      }
+    }
+  }
+  bullets=bullets.filter(b=>b.life>0 && b.x>-20 && b.x<W+20 && b.y>-20 && b.y<H+20);
+
+  // 敌人
+  for(let e of enemies){
+    if(e.dead){ e.deadT-=dt; continue; }
+    if(e.emerge>0)e.emerge=Math.max(0,e.emerge-dt*0.8);
+    e.step+=dt*6;
+    // 向碉堡推进:先到岸,再贴近
+    const goY = SEA_Y+ (e.targetX? 0:0);
+    if(e.y<SEA_Y+8) e.y+=e.spd*0.5*dt;          // 上岸
+    const dx=e.targetX-e.x;
+    e.x+=Math.sign(dx)*Math.min(Math.abs(dx),e.spd*dt);
+    // 沿沙滩缓爬高一点
+    e.y=clamp(e.y, SEA_Y-8, SEA_Y+26);
+    e.hurt=Math.max(0,e.hurt-dt);
+    // 到达碉堡 → 攻击
+    if(e.x<=BUNKER_X+50){
+      e.atkT-=dt;
+      if(e.atkT<=0){ e.atkT=0.9; damageBunker(e.elite?6:3); knock(e); }
+    }
+  }
+  enemies=enemies.filter(e=>!(e.dead&&e.deadT<=0));
+
+  // 补给
+  for(let s of supplies){
+    if(!s.landed){ s.y+=s.vy*dt; s.vy+=140*dt; s.swing+=dt*3;
+      if(s.y>=s.groundY){ s.y=s.groundY; s.landed=true; s.life=9; } }
+    else { s.life-=dt; }
+    if(dist(s.x,s.y,hero.x,hero.y)<46){ grabSupply(s); s.life=0; }
+  }
+  supplies=supplies.filter(s=>s.life>0);
+
+  // 弹壳物理
+  for(let c of casings){ c.vy+=c.g*dt; c.x+=c.vx*dt; c.y+=c.vy*dt; c.rot+=c.vr*dt; c.life-=dt;
+    if(c.y>SEA_Y-2){ c.y=SEA_Y-2; c.vy*=-0.3; c.vx*=0.6; } }
+  casings=casings.filter(c=>c.life>0);
+
+  // 粒子
+  for(let p of particles){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=(p.g||220)*dt; p.life-=dt; }
+  particles=particles.filter(p=>p.life>0);
+
+  shake*=Math.pow(0.001,dt);
+  if(msgT>0)msgT-=dt;
+
+  if(bunkerHP<=0){ gameOver(); }
+}
+
+function knock(e){ e.x+=6; }
+function damageBunker(d){ bunkerHP=clamp(bunkerHP-d,0,maxBunkerHP); shake=Math.min(shake+4,9); AudioFX.hurt();
+  for(let i=0;i<8;i++)particles.push({x:BUNKER_X+rand(-30,30),y:SEA_Y-rand(0,40),vx:rand(-80,80),vy:rand(-120,-20),life:rand(.3,.7),c:'#8c7a55',r:rand(1,3),g:300}); }
+
+function bloodBurst(x,y,big){
+  const n=big?12:7;
+  for(let i=0;i<n;i++)particles.push({x,y,vx:rand(-120,120),vy:rand(-160,40),life:rand(.3,.7),c:Math.random()<.5?'#9c2b2b':'#6e1818',r:rand(1,3),g:340});
+}
+function killEnemy(e,x,y){
+  e.dead=true; e.deadT=0.5; killCount++;
+  combo++; comboTimer=2.2;
+  const pts=(e.elite?50:10)*(1+Math.floor(combo/5));
+  score+=pts; AudioFX.kill();
+  for(let i=0;i<(e.elite?22:14);i++)particles.push({x,y,vx:rand(-180,180),vy:rand(-220,60),life:rand(.4,.9),c:Math.random()<.6?'#9c2b2b':'#3a4a2e',r:rand(1,3),g:360});
+  if(combo>0&&combo%10===0)setMsg(combo+' 连击!',1.2);
+}
+function gameOver(){
+  state='over'; AudioFX.over();
+  if(score>best){ best=score; localStorage.setItem('nbs_best',best); }
+}
+
+/* ---------- 补给 ---------- */
+function dropSupply(){
+  const kind=Math.random()<.5?'ammo':'heal';
+  supplies.push({x:rand(W*0.4,W*0.85),y:-20,vy:30,groundY:SEA_Y-10,landed:false,life:9,kind,swing:rand(0,6)});
+  AudioFX.supply(); setMsg('空投补给!',1.2);
+}
+function grabSupply(s){
+  AudioFX.supply();
+  if(s.kind==='ammo'){ hero.ammo=hero.clip; setMsg('弹药已补充',1.0); }
+  else { bunkerHP=clamp(bunkerHP+25,0,maxBunkerHP); setMsg('碉堡修复 +25',1.0); }
+  for(let i=0;i<10;i++)particles.push({x:s.x,y:s.y,vx:rand(-100,100),vy:rand(-140,-20),life:rand(.3,.6),c:s.kind==='ammo'?'#d9b34a':'#5fae6a',r:rand(1,3)});
+}
+
+/* ===========================================================================
+   渲染
+   =========================================================================== */
+let t=0;
+function draw(){
+  t+=0.016;
+  const sx=(Math.random()-.5)*shake, sy=(Math.random()-.5)*shake;
+  g.save(); g.translate(sx,sy);
+
+  drawSky(); drawSea(); drawBeach(); drawBunker();
+  // 补给绳降
+  for(let s of supplies)drawSupply(s);
+  // 敌人(远的先画)
+  enemies.slice().sort((a,b)=>a.y-b.y).forEach(drawEnemy);
+  drawHero();
+  drawCasings();
+  drawBullets();
+  drawParticles();
+  drawForeground();
+
+  g.restore();
+
+  drawHUD();
+  if(state==='title')drawTitle();
+  if(state==='pause')drawPause();
+  if(state==='over')drawOver();
+}
+
+function drawSky(){
+  const grd=g.createLinearGradient(0,0,0,SEA_Y);
+  grd.addColorStop(0,'#1a2b33'); grd.addColorStop(.6,'#2c4049'); grd.addColorStop(1,'#3b5560');
+  g.fillStyle=grd; g.fillRect(0,0,W,SEA_Y);
+  // 远处战机剪影 + 探照灯
+  g.fillStyle='rgba(255,240,200,.05)';
+  g.beginPath(); g.moveTo(W*0.7,0); g.lineTo(W*0.6,SEA_Y); g.lineTo(W*0.82,SEA_Y); g.closePath(); g.fill();
+  // 云带
+  g.fillStyle='rgba(20,30,36,.5)';
+  for(let i=0;i<5;i++){ const cx=((t*8+i*240)%(W+200))-100, cy=40+i*18; pxRect(cx,cy,90,10,'rgba(60,75,82,.4)'); pxRect(cx+20,cy-6,50,8,'rgba(60,75,82,.3)'); }
+}
+function drawSea(){
+  const grd=g.createLinearGradient(0,SEA_Y,0,H);
+  grd.addColorStop(0,'#2a4a58'); grd.addColorStop(1,'#16303a');
+  g.fillStyle=grd; g.fillRect(0,SEA_Y,W,H-SEA_Y);
+  // 浪行(像素横纹 + 起伏)
+  for(let r=0;r<7;r++){
+    const yy=SEA_Y+8+r*((H-SEA_Y)/7);
+    g.fillStyle=r%2? 'rgba(150,190,200,.10)':'rgba(120,165,180,.16)';
+    for(let x=0;x<W;x+=8){
+      const wv=Math.sin((x*0.02)+(t*2)+(r*0.7))*2;
+      g.fillRect(x,yy+wv,6,2);
+    }
+  }
+  // 海面泡沫线(岸边)
+  g.fillStyle='rgba(220,235,235,.25)';
+  for(let x=0;x<W;x+=6){ const f=Math.sin(x*0.05+t*3)*2; g.fillRect(x,SEA_Y+2+f,4,2); }
+}
+function drawBeach(){
+  // 沙滩斜带在碉堡底
+  g.fillStyle='#3a3a33';
+  // 反坦克障碍(捷克刺猬)剪影
+  for(let i=0;i<5;i++){ const bx=320+i*150+Math.sin(i)*10, by=SEA_Y+18; g.strokeStyle='rgba(20,24,22,.6)'; g.lineWidth=2;
+    g.beginPath(); g.moveTo(bx-8,by+8);g.lineTo(bx+8,by-6); g.moveTo(bx+8,by+8);g.lineTo(bx-8,by-6); g.moveTo(bx,by+10);g.lineTo(bx,by-8); g.stroke(); }
+}
+function drawBunker(){
+  const bx=BUNKER_X, top=SEA_Y-12;
+  // 碉堡主体(混凝土灰)
+  pxRect(bx-70,top,150,H-top,'#4a4f4a');
+  pxRect(bx-70,top,150,10,'#5a605a');
+  pxRect(bx-70,top+10,150,6,'#3c413c');
+  // 沙袋掩体
+  for(let i=0;i<6;i++){ const sx2=bx-66+i*24; pxRect(sx2,top-10,22,12,'#8a7b54'); pxRect(sx2+2,top-12,18,6,'#9a8b64'); }
+  for(let i=0;i<5;i++){ const sx2=bx-54+i*24; pxRect(sx2,top-20,22,12,'#7a6b48'); pxRect(sx2+2,top-22,18,6,'#8a7b58'); }
+  // 射击口暗影
+  pxRect(bx-40,top+30,80,18,'#22251f');
+  // 五星条纹小旗
+  const fx=bx+52, fy=top-46;
+  g.strokeStyle='#6a6a60'; g.lineWidth=2; g.beginPath(); g.moveTo(fx,fy); g.lineTo(fx,fy+34); g.stroke();
+  const flap=Math.sin(t*4)*2;
+  pxRect(fx,fy,26,16,'#b23a3a'); pxRect(fx,fy,26,3,'#ded6c8'); pxRect(fx,fy+6,26,3,'#ded6c8'); pxRect(fx,fy+12,26,3,'#ded6c8');
+  pxRect(fx,fy,11,9,'#2f4a7a');
+  // 混凝土损伤随血量
+  const dmg=1-bunkerHP/maxBunkerHP;
+  g.fillStyle='rgba(20,20,18,.5)';
+  for(let i=0;i<Math.floor(dmg*14);i++){ g.fillRect(bx-60+ (i*131%130), top+24+(i*71%90), 4,4); }
+}
+function drawHero(){
+  const hx=Math.round(hero.x), recoil=hero.recoil*3;
+  const top=SEA_Y-12;
+  const by=Math.round(top-30 + Math.sin(hero.bob)*1); // 站姿基线
+  const f=hero.facing;
+  // 影
+  pxRect(hx-10,top-2,22,4,'rgba(0,0,0,.3)');
+  // 腿
+  pxRect(hx-7,by+20,5,14,'#3c4a3a'); pxRect(hx+2,by+20,5,14,'#3c4a3a');
+  // 军靴
+  pxRect(hx-8,by+32,7,4,'#1c211c'); pxRect(hx+1,by+32,7,4,'#1c211c');
+  // 身体(军大衣)
+  pxRect(hx-9,by+4,18,18,'#54624c');
+  pxRect(hx-9,by+4,18,5,'#5e6c54');
+  // 武装带
+  pxRect(hx-9,by+12,18,3,'#34301f');
+  // 头(肤色)
+  pxRect(hx-6,by-6,12,12,'#caa07a');
+  // 钢盔(美式 M1)
+  pxRect(hx-8,by-10,16,7,'#46503e');
+  pxRect(hx-9,by-5,18,3,'#3a4234');
+  pxRect(hx-2,by-9,4,2,'#dcd4c0'); // 盔星
+  // 手臂 + 步枪(指向鼠标)
+  const sx2=hx+f*6, sy2=by+8;
+  const ang=Math.atan2(mouse.y-(sy2), mouse.x-(sx2));
+  g.save(); g.translate(sx2-recoil*Math.cos(ang),sy2-recoil*Math.sin(ang)); g.rotate(ang);
+  pxRect(-3,-2,6,4,'#caa07a');           // 手
+  pxRect(2,-2,26,4,'#5a4632');           // 枪身
+  pxRect(2,-3,26,1,'#7a6242');
+  pxRect(26,-2,5,4,'#3a3a3a');           // 枪管
+  pxRect(0,1,4,6,'#3a3a3a');             // 弹匣
+  // 枪口火光
+  if(hero.muzzle>0){ const m=hero.muzzle;
+    g.fillStyle='rgba(255,214,107,'+m+')';
+    g.beginPath(); g.moveTo(31,0); g.lineTo(31+12*m, -5*m); g.lineTo(31+18*m,0); g.lineTo(31+12*m,5*m); g.closePath(); g.fill();
+    g.fillStyle='rgba(255,255,230,'+m+')'; g.fillRect(30,-2,6,4);
+  }
+  g.restore();
+}
+function drawEnemy(e){
+  const x=Math.round(e.x), y=Math.round(e.y);
+  const emY = e.emerge*20; // 从水里冒出
+  const yy=y-emY;
+  const wob=Math.sin(e.step)*2;
+  // 水花/尾迹
+  if(e.emerge>0.1){ g.fillStyle='rgba(180,210,210,.4)'; g.fillRect(x-8,y+2,16,3); }
+  // 影
+  pxRect(x-7,y+12,14,3,'rgba(0,0,0,.25)');
+  const bodyC = e.elite? '#5a2e6e' : '#3f5a3a';
+  const skinC = e.elite? '#7fe0a0' : '#7aa06a';   // 生化绿
+  const flash = e.hurt>0? 'rgba(255,255,255,'+(e.hurt*5)+')':null;
+  // 腿
+  pxRect(x-5,yy+6,4,8,'#2a3a28'); pxRect(x+1,yy+6,4,8,'#2a3a28');
+  // 躯干(腐蚀军服)
+  pxRect(x-6,yy-6,12,12,bodyC);
+  pxRect(x-6,yy-6,12,3,'#2b3a2a');
+  // 头(生化变异肤色)
+  pxRect(x-5,yy-14,10,9,skinC);
+  // 发光眼
+  g.fillStyle='#e6ff5a'; g.fillRect(x-3,yy-11,2,2); g.fillRect(x+1,yy-11,2,2);
+  // 张开的手臂(前伸扑击)
+  pxRect(x+4,yy-3+wob,8,3,skinC);
+  pxRect(x-12,yy-3-wob,8,3,skinC);
+  // 精英尖刺
+  if(e.elite){ g.fillStyle='#c97ad6'; g.fillRect(x-6,yy-16,2,4); g.fillRect(x+4,yy-16,2,4); }
+  // 受击白闪
+  if(flash){ g.fillStyle=flash; g.fillRect(x-7,yy-15,14,22); }
+  // 血条
+  if(e.hp<e.maxhp){ const w=14,h=2; pxRect(x-w/2,yy-20,w,h,'#311'); pxRect(x-w/2,yy-20,w*(e.hp/e.maxhp),h,e.elite?'#d36ad6':'#7fd06a'); }
+}
+function drawSupply(s){
+  const x=Math.round(s.x),y=Math.round(s.y);
+  if(!s.landed){ // 降落伞
+    const sw=Math.sin(s.swing)*4;
+    g.fillStyle='rgba(230,225,200,.85)';
+    g.beginPath(); g.arc(x+sw,y-16,14,Math.PI,0); g.fill();
+    g.strokeStyle='rgba(200,195,170,.7)'; g.lineWidth=1;
+    g.beginPath(); g.moveTo(x+sw-12,y-16);g.lineTo(x-3,y); g.moveTo(x+sw+12,y-16);g.lineTo(x+3,y); g.stroke();
+  }
+  const c = s.kind==='ammo'? '#d9b34a':'#5fae6a';
+  pxRect(x-7,y-7,14,14,'#3a3a30'); pxRect(x-7,y-7,14,4,c);
+  g.fillStyle='#1a1a14'; g.font='bold 10px monospace'; g.textAlign='center';
+  g.fillText(s.kind==='ammo'?'A':'+', x, y+3);
+  if(s.landed && s.life<3 && Math.floor(s.life*6)%2===0){ g.globalAlpha=.4; pxRect(x-9,y-9,18,18,'rgba(255,255,255,.3)'); g.globalAlpha=1; }
+}
+function drawBullets(){
+  for(let b of bullets){
+    g.strokeStyle='rgba(255,224,140,.5)'; g.lineWidth=2; g.beginPath();
+    for(let i=0;i<b.trail.length;i++){ const p=b.trail[i]; i?g.lineTo(p.x,p.y):g.moveTo(p.x,p.y); } g.stroke();
+    pxRect(b.x-2,b.y-1,4,2,'#fff1b0');
+  }
+}
+function drawCasings(){
+  for(let c of casings){ g.save(); g.translate(c.x,c.y); g.rotate(c.rot);
+    pxRect(-2,-1,4,2,'#c8a23a'); g.restore(); }
+}
+function drawParticles(){
+  for(let p of particles){ g.globalAlpha=clamp(p.life*2,0,1); pxRect(p.x-p.r,p.y-p.r,p.r*2,p.r*2,p.c); }
+  g.globalAlpha=1;
+}
+function drawForeground(){
+  // 暗角地面前景压暗
+  g.fillStyle='rgba(8,12,10,.35)'; g.fillRect(0,H-30,W,30);
+}
+
+/* ---------- HUD ---------- */
+function drawHUD(){
+  // 顶栏
+  g.fillStyle='rgba(8,14,16,.55)'; g.fillRect(0,0,W,34);
+  g.fillStyle='#dfe8e2'; g.font='bold 16px "Courier New",monospace'; g.textAlign='left';
+  g.fillText('得分 '+score, 14, 23);
+  g.fillStyle='#9fb0a6'; g.font='12px "Courier New",monospace';
+  g.fillText('最高 '+best, 120, 22);
+  g.textAlign='center'; g.fillStyle='#d9b34a'; g.font='bold 15px "Courier New",monospace';
+  g.fillText('第 '+(wave||1)+' 波', W/2, 22);
+  if(combo>1){ g.fillStyle='#ff8c52'; g.font='bold 13px "Courier New",monospace'; g.fillText(combo+' 连击', W/2, 33); }
+
+  // 碉堡血条(右上)
+  const bw=180,bh=12,bx=W-bw-14,by=12;
+  g.fillStyle='#23120f'; g.fillRect(bx,by,bw,bh);
+  const hp=bunkerHP/maxBunkerHP;
+  g.fillStyle=hp>.5?'#5fae6a':hp>.25?'#d9b34a':'#c23a3a';
+  g.fillRect(bx,by,bw*hp,bh);
+  g.strokeStyle='#0c1410'; g.lineWidth=2; g.strokeRect(bx,by,bw,bh);
+  g.fillStyle='#dfe8e2'; g.font='10px "Courier New",monospace'; g.textAlign='left';
+  g.fillText('碉堡完整度', bx, by-2);
+
+  // 弹药(底部右)
+  const ax=W-150, ay=H-30;
+  g.textAlign='left'; g.font='bold 14px "Courier New",monospace';
+  if(hero){
+    g.fillStyle=hero.reloading?'#d9b34a':(hero.ammo<=2?'#c23a3a':'#dfe8e2');
+    let txt = hero.reloading? '换弹中…' : ('弹药 '+hero.ammo+' / '+hero.clip);
+    g.fillText(txt, ax, ay+10);
+    // 子弹格
+    for(let i=0;i<hero.clip;i++){ pxRect(ax+i*9, ay+16, 6, 10, i<hero.ammo?'#d9b34a':'#3a3a30'); }
+  }
+  // 中央消息
+  if(msgT>0 && msg){ g.globalAlpha=clamp(msgT,0,1); g.textAlign='center';
+    g.fillStyle='#0c1410'; g.font='bold 26px "Courier New",monospace'; g.fillText(msg, W/2+2, 110+2);
+    g.fillStyle='#f0e6c8'; g.fillText(msg, W/2, 110); g.globalAlpha=1; }
+}
+
+/* ---------- 屏幕 ---------- */
+function panel(){ g.fillStyle='rgba(6,10,12,.72)'; g.fillRect(0,0,W,H); }
+function drawTitle(){
+  panel();
+  g.textAlign='center';
+  // 标题像素描边
+  g.fillStyle='#0c1410'; g.font='bold 44px "Courier New",monospace';
+  g.fillText('诺曼底碉堡',W/2+3,H/2-58+3);
+  g.fillStyle='#e8dcb4'; g.fillText('诺曼底碉堡',W/2,H/2-58);
+  g.fillStyle='#9fb0a6'; g.font='16px "Courier New",monospace';
+  g.fillText('艾森豪威尔的最后防线',W/2,H/2-26);
+  g.fillStyle='#7c8d84'; g.font='13px "Courier New",monospace';
+  g.fillText('海里涌出的生化士兵正逼近防线。守住碉堡，撑过每一波。',W/2,H/2+6);
+  g.fillStyle='#d9b34a'; g.font='bold 18px "Courier New",monospace';
+  g.fillText( (Math.floor(t*2)%2? '▶ 点击 / 按空格 开始':'  点击 / 按空格 开始 '),W/2,H/2+48);
+  g.fillStyle='#5c6d64'; g.font='12px "Courier New",monospace';
+  g.fillText('鼠标瞄准 · 点击开火 · A/D 移动 · R 换弹 · P 暂停',W/2,H/2+82);
+  if(best>0){ g.fillStyle='#9fb0a6'; g.fillText('历史最高 '+best,W/2,H/2+108); }
+}
+function drawPause(){
+  panel(); g.textAlign='center';
+  g.fillStyle='#e8dcb4'; g.font='bold 34px "Courier New",monospace'; g.fillText('暂停',W/2,H/2-6);
+  g.fillStyle='#9fb0a6'; g.font='14px "Courier New",monospace'; g.fillText('按 P 或点击继续',W/2,H/2+26);
+}
+function drawOver(){
+  panel(); g.textAlign='center';
+  g.fillStyle='#c23a3a'; g.font='bold 40px "Courier New",monospace'; g.fillText('防线失守',W/2,H/2-50);
+  g.fillStyle='#dfe8e2'; g.font='18px "Courier New",monospace';
+  g.fillText('坚守到第 '+wave+' 波 · 歼敌 '+killCount,W/2,H/2-12);
+  g.fillStyle='#d9b34a'; g.font='bold 28px "Courier New",monospace'; g.fillText('得分 '+score,W/2,H/2+24);
+  if(score>=best){ g.fillStyle='#5fae6a'; g.font='14px "Courier New",monospace'; g.fillText('★ 新纪录 ★',W/2,H/2+50); }
+  else { g.fillStyle='#9fb0a6'; g.font='14px "Courier New",monospace'; g.fillText('最高 '+best,W/2,H/2+50); }
+  g.fillStyle=(Math.floor(t*2)%2?'#e8dcb4':'#7c8d84'); g.font='bold 16px "Courier New",monospace';
+  g.fillText('点击 / 按空格 返回',W/2,H/2+86);
+}
+
+/* ---------- 像素方块 helper ---------- */
+function pxRect(x,y,w,h,c){ g.fillStyle=c; g.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h)); }
+
+/* ---------- 主循环 ---------- */
+function loop(){
+  const n=now(); let dt=(n-last)/1000; last=n;
+  dt=Math.min(dt,0.05);
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+reset();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
