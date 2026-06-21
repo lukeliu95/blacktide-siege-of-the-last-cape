@@ -1084,13 +1084,19 @@ class Battle extends Phaser.Scene {
     this.hudWeapon = this.add.text(DW-26,DH-88,'MG-42 Machine Gun',{fontFamily:'"Black Ops One"',fontSize:'16px',color:'#d8b15a'}).setOrigin(1,1).setDepth(90);
     // r24: 武器图标条(右下 hudWeapon 上方,4 块 36×30 + 数字键标 + 当前金边)
     const ICONS=['MG','SG','SR','FL'];                                  // 缩写图标(MG-42/Shotgun/SniperRifle/Flamer)
-    this.hudWBoxes=[]; this.hudWLabels=[];
+    this.hudWBoxes=[]; this.hudWLabels=[]; this.hudWLvPips=[];          // r47: LV pips
     for(let i=0;i<4;i++){
       const x=DW-26-(4-i-1)*44-30, y=DH-118;
       const r=this.add.rectangle(x,y,38,30,0x1a160c,0.85).setOrigin(0.5,0.5).setDepth(89).setStrokeStyle(2,0x4a3a1c);
       const ic=this.add.text(x,y-1,ICONS[i],{fontFamily:'"Black Ops One"',fontSize:'13px',color:'#9aa3a0'}).setOrigin(0.5).setDepth(90);
       const num=this.add.text(x+15,y-12,(i+1).toString(),{fontFamily:'"Black Ops One"',fontSize:'8px',color:'#d8b15a'}).setOrigin(0.5).setDepth(91);
-      this.hudWBoxes.push(r); this.hudWLabels.push(ic);
+      // r47: LV pips(box 顶部 3 个 4×3 小条,亮=已 Armory 升级)
+      const pips = [];
+      for(let p=0;p<3;p++){
+        const pip = this.add.rectangle(x-12+p*12, y-18, 8, 3, 0x3a3a30, 1).setOrigin(0.5).setDepth(91);
+        pips.push(pip);
+      }
+      this.hudWBoxes.push(r); this.hudWLabels.push(ic); this.hudWLvPips.push(pips);
     }
     this.hudAmmo = this.add.text(DW-26,DH-46,'180 / 180',{...F,fontSize:'26px',fontStyle:'600',color:'#e7e6df'}).setOrigin(1,1).setDepth(90);
     this.hudAmmoLbl = this.add.text(DW-26,DH-18,'AMMUNITION',{...F,fontSize:'12px',color:'#9aa3a0'}).setOrigin(1,1).setDepth(90);
@@ -1169,6 +1175,7 @@ class Battle extends Phaser.Scene {
     this.spawnQ=[]; this.spawnT=0; this.waveActive=false;
     this.zombies.forEach(z=>{ z.shadow&&z.shadow.destroy(); z.spr.destroy(); }); this.zombies=[];
     this.roarBusy=0; this.slowmoT=0; this.slowmoCD=0; this.boostTimer=0; this.activeBoss=null; this._phaseFreeze=0;
+    this._bloodlustT=0; this._headshotChain=[];                       // r47
     if(this.phaseVig)this.phaseVig.setAlpha(0);
     const _bb=document.getElementById('bossBgm'); _bb&&_bb.pause();
     if(this.slowVig)this.slowVig.setAlpha(0);
@@ -1855,13 +1862,24 @@ class Battle extends Phaser.Scene {
       this._lastWeaponTex = tx;
     }
     if(this.hudWeapon)this.hudWeapon.setText(w.name);
-    // r24: 武器图标条高亮当前
+    // r24: 武器图标条高亮当前 + r47 LV pips 同步 Armory upgrades
     if(this.hudWBoxes){
       this.hudWBoxes.forEach((r,i)=>{ const on=i===this.weaponIdx;
         r.setStrokeStyle(on?2:2, on?0xd8b15a:0x4a3a1c);
         r.fillColor = on?0x3a2a14:0x1a160c;
         this.hudWLabels[i].setColor(on?'#fff4cc':'#9aa3a0');
       });
+      // r47: pips 按 _patchedWeapons[i]._lv 亮(LV 1 亮 1 pip,LV3 全亮)
+      if(this.hudWLvPips && this._patchedWeapons){
+        this.hudWLvPips.forEach((pips, i)=>{
+          const lv = this._patchedWeapons[i]?._lv || 0;
+          pips.forEach((pip, p)=>{
+            const active = p < lv;
+            pip.fillColor = active ? 0xd8b15a : 0x3a3a30;
+            pip.setAlpha(active ? 1 : 0.55);
+          });
+        });
+      }
     }
   }
   switchWeapon(idx){ if(idx<0||idx>=WEAPONS.length||idx===this.weaponIdx)return;
@@ -1999,7 +2017,7 @@ class Battle extends Phaser.Scene {
   hitAt(px,py,w){ const HITBOX={ x:0.30, y:0.06, w:0.40, h:0.92 };
     let hit=null, hitScore=Infinity;
     for(const z of this.zombies){ if(z.dead)continue; const b=z.spr.getBounds(); const hx=b.x+b.width*HITBOX.x, hw=b.width*HITBOX.w, hy=b.y+b.height*HITBOX.y, hh=b.height*HITBOX.h; if(px>=hx&&px<=hx+hw&&py>=hy&&py<=hy+hh){ const cx=hx+hw/2, dx=px-cx, dy=py-(hy+hh/2); const sc=-z.p*1000+Math.hypot(dx,dy); if(sc<hitScore){ hit=z; hitScore=sc; } } }
-    if(hit){ const b=hit.spr.getBounds(); const hy=b.y+b.height*HITBOX.y, hh=b.height*HITBOX.h; const head=py<hy+hh*0.22; const dmg=(head?w.headMul:1)*w.dmg*((this.boostTimer||0)>0?2:1);
+    if(hit){ const b=hit.spr.getBounds(); const hy=b.y+b.height*HITBOX.y, hh=b.height*HITBOX.h; const head=py<hy+hh*0.22; const dmg=(head?w.headMul:1)*w.dmg*((this.boostTimer||0)>0?2:1)*((this._bloodlustT||0)>0?1.5:1);     // r47 bloodlust ×1.5
       hit.hp-=dmg; (hit.cfg.boss?AudioFX.bossHit(hit.spr.x):AudioFX.hit(hit.spr.x));
       // r28: Leviathan 命中触发 hurt 帧(替代 tint 闪)
       if(hit.type==='leviathan') this.bossLevHurt(hit);
@@ -2010,7 +2028,9 @@ class Battle extends Phaser.Scene {
       if(head) this.fleshChunk.emitParticleAt(px,py,8);
       hit.spr.setTintFill(0xffffff); this.time.delayedCall(40,()=>{ if(!hit.dead)hit.spr.setTint(hit.cfg.tint); });
       this.dmgFloat(px+rnd(-8,8), py-6, dmg, head, hit.cfg && hit.cfg.boss);
-      if(head) AudioFX.headshot();         // r22: HEADSHOT 标签由 dmgFloat crit 内置,移除冗余 floatText
+      if(head){ AudioFX.headshot();        // r22: HEADSHOT 标签由 dmgFloat crit 内置,移除冗余 floatText
+        this._trackHeadshotChain && this._trackHeadshotChain();   // r47: bloodlust chain tracker
+      }
       // r46: Critical hit visual — head + dmg≥20 触发 80ms freeze + 红 flash + 大字 CRITICAL + camera punch
       if(head && dmg >= 20){
         this._critHit && this._critHit(px, py);
@@ -2050,6 +2070,39 @@ class Battle extends Phaser.Scene {
     // ammo 数字 1.2× 弹缩
     if(this.hudAmmo){ this.hudAmmo.setScale(1.2);
       this.tweens.add({targets:this.hudAmmo, scale:1, duration:200, ease:'Back.easeOut'});
+    }
+  }
+  // r47: Bloodlust 系统 — 6s 窗口内 5 head kills 触发 8s buff(全 dmg ×1.5 + 屏边红脉冲 + HUD 倒计时)
+  _trackHeadshotChain(){
+    const now = this.time.now;
+    this._headshotChain = (this._headshotChain || []).filter(t => now - t < 6000);
+    this._headshotChain.push(now);
+    if(this._headshotChain.length >= 5 && !this._bloodlustT){
+      this._activateBloodlust();
+    }
+  }
+  _activateBloodlust(){
+    this._bloodlustT = 8.0;
+    this._headshotChain = [];                                          // 清池防过快连发
+    AudioFX.bossPhase && AudioFX.bossPhase(DW/2);                      // 复用 boss phase sfx 戏剧感
+    if(this.cameras && this.cameras.main) this.cameras.main.shake(180, 0.008);
+    // 屏中央大字 BLOODLUST 弹出
+    const t = this.add.text(DW/2, DH*0.32, '🩸 BLOODLUST · DAMAGE ×1.5', {fontFamily:'"Black Ops One",cursive', fontSize:'30px', color:'#ff3a2a', stroke:'#3a0a0a', strokeThickness:4}).setOrigin(0.5).setDepth(95).setScale(0.4);
+    t.setLetterSpacing && t.setLetterSpacing(4);
+    this.tweens.add({targets:t, scale:1.0, duration:280, ease:'Back.easeOut'});
+    this.tweens.add({targets:t, alpha:0, duration:540, delay:1200, onComplete:()=>t.destroy()});
+  }
+  _tickBloodlust(realDt){
+    if(!this._bloodlustT) return;
+    this._bloodlustT = Math.max(0, this._bloodlustT - realDt);
+    // 屏边红脉冲(edgePulse 已 r19 加)
+    if(this.edgePulse){
+      const pulse = 0.18 + 0.22 * Math.abs(Math.sin(this.time.now/180));
+      this.edgePulse.setAlpha(pulse);
+    }
+    // 到期 cleanup
+    if(this._bloodlustT === 0){
+      if(this.edgePulse) this.edgePulse.setAlpha(0);
     }
   }
   // r46: Critical hit — 高伤爆头触发:80ms 玩法 freeze + 红 flash + 'CRITICAL' 大字 + camera punch zoom
@@ -2359,6 +2412,7 @@ class Battle extends Phaser.Scene {
     if((this._phaseFreeze||0)>0){ this._phaseFreeze-=realDt; if(this._phaseFreeze>0) return; }   // r22 punch frame
     if(this.slowmoCD>0)this.slowmoCD-=realDt;                       // 慢动作冷却
     if((this.boostTimer||0)>0)this.boostTimer-=realDt;              // damage boost 倒计时
+    this._tickBloodlust && this._tickBloodlust(realDt);             // r47 bloodlust tick
     if(this.slowmoT>0){ this.slowmoT-=realDt; if(this.slowmoT<=0){ if(this.slowVig)this.slowVig.setAlpha(0); AudioFX.diveOut(); } }
     const dt = this.slowmoT>0? realDt*0.32 : realDt;                // 子弹时间:玩法 dt 减速
     this._tickBossEscorts && this._tickBossEscorts(dt);             // r33: BOSS escort adaptive 补给
@@ -2577,6 +2631,15 @@ class Battle extends Phaser.Scene {
     if(this.boostBadge){
       if((this.boostTimer||0)>0){ this.boostBadge.setVisible(true); this.boostBadgeTxt.setVisible(true).setText('×2  '+this.boostTimer.toFixed(1)+'s'); const pulse=0.85+0.15*Math.sin(this.time.now/80); this.boostBadge.setAlpha(pulse); }
       else { this.boostBadge.setVisible(false); this.boostBadgeTxt.setVisible(false); }
+    }
+    // r47: bloodlust 倒计时 HUD(顶部中央 hudWave 下方)
+    if(!this._bloodlustTxt) this._bloodlustTxt = this.add.text(DW/2, 90, '', {fontFamily:'"Black Ops One",cursive', fontSize:'15px', color:'#ff3a2a', stroke:'#3a0a0a', strokeThickness:3}).setOrigin(0.5).setDepth(93);
+    if((this._bloodlustT||0) > 0){
+      this._bloodlustTxt.setText('🩸 BLOODLUST · '+this._bloodlustT.toFixed(1)+'s · ×1.5 DMG');
+      const pulse = 0.85 + 0.15*Math.sin(this.time.now/110);
+      this._bloodlustTxt.setAlpha(pulse);
+    } else {
+      this._bloodlustTxt.setText('');
     }
     if(this.activeBoss && !this.activeBoss.dead && this.bossHpFill){
       const bz=this.activeBoss, p=Math.max(0,bz.hp/bz.maxhp);
