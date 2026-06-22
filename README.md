@@ -107,16 +107,29 @@ No `npm install`. No build. No bundler. No env vars required for play.
 
 ---
 
-## Evolution Timeline
+## Evolution Timeline · r1 → r60 (COMPLETE)
 
-This game was built across **30 rounds of AI-driven iteration** — wave tuning, sprite re-rolls, boss phase choreography, BGM stem swaps, cutscene re-shoots. Every round is logged.
+Built across **60 rounds of AI-driven iteration** + 3 hotfixes (r27.5 / r27.6 / r51.5). Full per-round ledger at [`docs/04-evolve/ledger.tsv`](docs/04-evolve/ledger.tsv) (64 lines).
 
-本作经历 **30 轮 AI 自主迭代**——关卡调参、立绘重抽、BOSS 分阶编排、BGM 分轨替换、过场重拍，每一轮均留有记录。
+| Phase | Rounds | Highlights |
+|---|---|---|
+| **Foundation** | r1–r10 | Phaser scaffold → GPT-Image-2 photoreal pivot → 10-level structure + cutscenes + first BGM |
+| **Visual core** | r11–r19 | Monster walk anims · scene transitions · UI English-ization · level pacing balance |
+| **Cinematic core** | r20–r28 | Reverb bus · BOSS phase choreography · spawn telegraph · 8-frame Leviathan sprite sheet · Eisen portrait |
+| **Systems depth** | r29–r39 | Stereo SFX · Chapter epigraph · Final-victory redo · Combo milestone · S/A/B/C chapter rank |
+| **Meta layer** | r40–r49 | Codex archive (9-grid) · BOSS adaptive escort · Loading splash · Player progress save/resume · Top-5 leaderboard · Achievements · Armory upgrade tree · Daily login bonus |
+| **Polish & retention** | r50–r57 | SEO 5-block + OG hero · Critical-hit freeze · Bloodlust chain · Streak bonus · SR scope zoom · FL fan AOE · Eisen voice barks · Difficulty layer + Tab-skip |
+| **Endgame (r58–r60)** | r58–r60 | BOSS attack telegraph · HARD-mode credits ×1.5 · Single-run ENGAGEMENT REPORT · 9 achievements incl. 🏆 Cycle 9 Marshal · final repo + Vercel push |
 
-- Full ledger: [`docs/04-evolve/ledger.tsv`](docs/04-evolve/ledger.tsv)
-- Highlight stills: [`docs/demo/`](docs/demo/)
+- Highlight stills: [`docs/demo/`](docs/demo/) (60+ screenshots, one per round)
   - `r28-lev-phase2-rage.jpg` — Leviathan Phase 2 enrage
   - `r30-eisen-portrait.jpg` — Final Eisen portrait
+  - `r41-archive-9grid.jpg` — 9-monster codex
+  - `r53-streak-5day.jpg` — Daily streak bonus banner
+  - `r58-boss-telegraph.jpg` — BOSS attack warning
+  - `r59-run-stats.jpg` — Engagement report
+
+**Iteration status: COMPLETE at r60.** No further rounds planned. Live at <https://normandy-bunker-shooter.vercel.app>.
 
 ---
 

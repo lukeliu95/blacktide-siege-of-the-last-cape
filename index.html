@@ -1002,6 +1002,8 @@ const ACHIEVEMENTS = [
   // r59 endgame
   { id:'hard_master',     icon:'🔥', name:'Hard Marshal',     desc:'Hold Cycle 9 on HARD difficulty.' },
   { id:'sharpshooter',    icon:'◎', name:'Sharpshooter',     desc:'End a run with 50%+ accuracy and 30%+ headshots.' },
+  // r60 endgame · 终极成就
+  { id:'cycle_marshal',   icon:'🏆', name:'Cycle 9 Marshal',  desc:'Unlock all other achievements. Cycle 9 belongs to you.' },
 ];
 const EISEN_LINES = {
   chapter:[null,
@@ -1890,7 +1892,16 @@ class Battle extends Phaser.Scene {
   // r44: Achievement 系统 — localStorage 持久化已解锁 set,_unlockAch 触发右上角 banner
   _achSeen(){ try{ return new Set(JSON.parse(localStorage.getItem('bt_ach')||'[]')); }catch(e){ return new Set(); } }
   _unlockAch(id){
-    const seen = this._achSeen(); if(seen.has(id)) return;
+    const seen = this._achSeen();
+    // r60: cycle_marshal 入口 check — 前 8 全 unlock(含当前即将 unlock 的 id)→ 自动触发 cycle_marshal
+    if(id !== 'cycle_marshal' && !seen.has('cycle_marshal')){
+      const others = ACHIEVEMENTS.filter(a => a.id !== 'cycle_marshal').map(a => a.id);
+      const willHave = new Set(seen); willHave.add(id);
+      if(others.every(oid => willHave.has(oid))){
+        this.time.delayedCall(2800, ()=> this._unlockAch('cycle_marshal'));
+      }
+    }
+    if(seen.has(id)) return;
     const ach = ACHIEVEMENTS.find(a => a.id === id); if(!ach) return;
     seen.add(id); try{ localStorage.setItem('bt_ach', JSON.stringify(Array.from(seen))); }catch(e){}
     // 右上 banner slide-in 2.4s
@@ -1903,6 +1914,14 @@ class Battle extends Phaser.Scene {
     this.time.delayedCall(2400, ()=>{
       card.style.right = '-420px'; card.style.opacity = '0';
     });
+    // r60: cycle_marshal 终极成就 — 解锁任一成就后 check 前 8 是否全 unlock(自身 cycle_marshal 不计)
+    if(id !== 'cycle_marshal'){
+      const seen2 = this._achSeen();
+      const others = ACHIEVEMENTS.filter(a => a.id !== 'cycle_marshal').map(a => a.id);
+      if(others.every(oid => seen2.has(oid))){
+        this.time.delayedCall(2800, ()=> this._unlockAch('cycle_marshal'));   // 延 2.8s 让前一 banner 退完
+      }
+    }
   }
   // 全局 check — 调用点散落但 method 集中
   _checkAch(){
